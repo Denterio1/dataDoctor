@@ -21,7 +21,7 @@ Covers every operation the agent can perform:
 """
 
 from __future__ import annotations
-
+import pandas as pd
 import sys
 import os
 import csv
@@ -31,6 +31,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+
+from src.data.schema_validator import validate_schema, infer_schema, schema_to_dict, schema_from_dict, FieldSchema
+from src.data.encoding_advisor import encoding_advisor
+from src.data.correlation_network import build_correlation_network
+from src.data.target_detector import detect_target
+from src.data.feature_engineer import engineer_features
 from src.data.loader        import load_csv
 from src.data.analyzer      import full_report, shape, missing_values, duplicate_rows, basic_stats, detect_outliers
 from src.data.cleaner       import handle_missing, remove_duplicates
@@ -441,6 +447,146 @@ def cmd_relationships(args: list[str]) -> None:
             print()
     print()
 
+def cmd_encoding(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Smart Encoding Advisor: {path}", CYAN))
+    print(SEPARATOR)
+
+    data = safe_load(path)
+
+    # detect target column
+    df = data["df"]
+    numeric_cols = [col for col in df.columns if pd.api.types.is_numeric_dtype(df[col])]
+    cat_cols     = [col for col in df.columns if not pd.api.types.is_numeric_dtype(df[col])]
+
+    print()
+    print(c("  Model type:", BOLD))
+    print(f"  1. Tree / Boosting   (XGBoost, RandomForest, LightGBM)")
+    print(f"  2. Linear            (LogisticRegression, LinearSVC)")
+    print(f"  3. Neural Network    (MLP, Keras)")
+    model_choice = input(c("\n  Your choice (1-3, default=1): ", YELLOW)).strip() or "1"
+    model_map = {"1": "tree", "2": "linear", "3": "neural"}
+    model_type = model_map.get(model_choice, "tree")
+
+    target_col = None
+    if numeric_cols:
+        print()
+        print(c("  Numeric columns (potential targets):", BOLD))
+        for i, col in enumerate(numeric_cols, 1):
+            print(f"  {i}. {col}")
+        print(f"  0. No target column")
+        t_choice = input(c("\n  Select target column (0 to skip): ", YELLOW)).strip()
+        if t_choice.isdigit() and 1 <= int(t_choice) <= len(numeric_cols):
+            target_col = numeric_cols[int(t_choice) - 1]
+
+    print()
+    print(c("  Analyzing...", DIM))
+
+    result = encoding_advisor(data, target_col=target_col, model_type=model_type)
+
+    print()
+    print(c(f"  {result['summary']}", CYAN))
+    print()
+
+    for r in result["columns"]:
+        risk_color = GREEN if r["risk"] == "low" else YELLOW if r["risk"] == "medium" else RED
+
+        print(c(f"  ┌─ {r['column']}", CYAN))
+        print(f"  │  strategy   : {c(r['strategy'], risk_color + BOLD)}")
+        print(f"  │  cardinality: {c(str(r['n_unique']), WHITE)} unique ({r['cardinality']})")
+        print(f"  │  entropy    : {c(str(r['entropy']), DIM)}")
+        print(f"  │  imbalance  : {c(str(r['imbalance']) + 'x', DIM)}")
+        if r["target_corr"] is not None:
+            print(f"  │  target corr: {c(str(r['target_corr']), YELLOW)}")
+        if r["is_ordinal"]:
+            print(f"  │  order      : {c(' < '.join(r['ordinal_scale']), GREEN)}")
+        print(f"  │  reason     : {c(r['reason'], DIM)}")
+        print(f"  │  sklearn    : {c(r['sklearn_tip'], DIM)}")
+        if r["warnings"]:
+            for w in r["warnings"]:
+                print(f"  │  {c('⚠ ' + w, YELLOW)}")
+        print(c("  └" + "─" * 50, DIM))
+        print()
+
+    print(c("  ── Pipeline Code ────────────────────────────────────", CYAN))
+    print()
+    for line in result["pipeline_code"].splitlines():
+        print(f"  {c(line, WHITE)}")
+    print()
+
+def cmd_schema(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Schema Validator: {path}", CYAN))
+    print(SEPARATOR)
+
+    data = safe_load(path)
+
+    print()
+    print(c("  What do you want to do?", BOLD))
+    print(f"  1. Auto-infer schema from data and validate")
+    print(f"  2. Load schema from JSON file")
+    print(f"  3. Export inferred schema to JSON")
+    choice = input(c("\n  Your choice (1-3): ", YELLOW)).strip()
+
+    if choice == "3":
+        schema   = infer_schema(data)
+        base, _  = os.path.splitext(path)
+        out_path = f"{base}_schema.json"
+        with open(out_path, "w", encoding="utf-8") as f:
+            import json
+            json.dump(schema_to_dict(schema), f, indent=2)
+        print(c(f"\n  ✓ Schema exported to: {out_path}", GREEN))
+        print(c("  Edit it and re-run with option 2 to validate.", DIM))
+        print()
+        return
+
+    if choice == "2":
+        schema_path = input(c("  Schema JSON file path: ", YELLOW)).strip().strip('"')
+        try:
+            import json
+            with open(schema_path, "r", encoding="utf-8") as f:
+                schema = schema_from_dict(json.load(f))
+        except Exception as e:
+            print(c(f"\n  ✗ Could not load schema: {e}", RED))
+            return
+    else:
+        schema = infer_schema(data)
+
+    result = validate_schema(data, schema)
+
+    print()
+    valid_color = GREEN if result["valid"] else RED
+    print(c(f"  {result['summary']}", valid_color))
+    print()
+    print(f"  Coverage : {c(str(result['coverage']) + '%', CYAN)} of columns validated")
+    if result["uncovered"]:
+        print(f"  Uncovered: {c(', '.join(result['uncovered']), DIM)}")
+    print()
+
+    for r in result["results"]:
+        if r["status"] == "pass":
+            icon  = c("✓", GREEN)
+            color = GREEN
+        elif r["status"] == "missing":
+            icon  = c("?", YELLOW)
+            color = YELLOW
+        else:
+            icon  = c("✗", RED)
+            color = RED
+
+        print(f"  {icon}  {c(r['column'], color + BOLD)}")
+
+        for p in r["passed"]:
+            print(f"     {c('✓ ' + p, DIM)}")
+        for w in r["warnings"]:
+            print(f"     {c('⚠ ' + w, YELLOW)}")
+        for e in r["errors"]:
+            print(f"     {c('✗ ' + e, RED)}")
+        print()
+    print()
+
 
 def cmd_suggest(args: list[str]) -> None:
     path = require_file(args)
@@ -614,6 +760,123 @@ def cmd_drift(args: list[str]) -> None:
 
     print()
 
+def cmd_engineer(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Auto Feature Engineering: {path}", CYAN))
+    print(SEPARATOR)
+
+    data     = safe_load(path)
+    enriched, log = engineer_features(data)
+
+    total = sum(len(v) for v in log.values())
+    print()
+    print(c(f"  Generated {total} new feature(s):\n", CYAN))
+
+    if log["date"]:
+        print(c("  ── Date Features ────────────────────────────────────", CYAN))
+        for f in log["date"]:
+            print(f"  {c('+', GREEN)} {f}")
+        print()
+
+    if log["numeric"]:
+        print(c("  ── Numeric Features ─────────────────────────────────", CYAN))
+        for f in log["numeric"]:
+            print(f"  {c('+', GREEN)} {f}")
+        print()
+
+    if log["interaction"]:
+        print(c("  ── Interaction Features ─────────────────────────────", CYAN))
+        for f in log["interaction"]:
+            print(f"  {c('+', GREEN)} {f}")
+        print()
+
+    if log["text"]:
+        print(c("  ── Text Features ────────────────────────────────────", CYAN))
+        for f in log["text"]:
+            print(f"  {c('+', GREEN)} {f}")
+        print()
+
+    base, ext = os.path.splitext(path)
+    out_path  = f"{base}_engineered.csv"
+    enriched["df"].to_csv(out_path, index=False, encoding="utf-8")
+
+    print(c(f"  ✓ Saved to: {out_path}", GREEN))
+    print(f"  Original : {len(data['df'].columns)} columns")
+    print(f"  New      : {c(str(len(enriched['df'].columns)), GREEN)} columns")
+    print()
+
+def cmd_target(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Target Column Detection: {path}", CYAN))
+    print(SEPARATOR)
+
+    data   = safe_load(path)
+    result = detect_target(data)
+
+    conf_color = GREEN if result["confidence"] == "high" else YELLOW if result["confidence"] == "medium" else RED
+    task_color = CYAN if result["task_type"] == "classification" else YELLOW if result["task_type"] == "regression" else DIM
+
+    print()
+    print(f"  {c('Recommended target', BOLD)} : {c(result['recommended'], GREEN)}")
+    print(f"  {c('Task type', BOLD)}          : {c(result['task_type'].upper(), task_color)}")
+    print(f"  {c('Confidence', BOLD)}         : {c(result['confidence'].upper(), conf_color)}")
+    print(f"  {c('Reason', BOLD)}             : {c(result['reason'], DIM)}")
+    print()
+
+    print(c("  ── All Candidates ───────────────────────────────────", CYAN))
+    print()
+    for i, cand in enumerate(result["candidates"]):
+        rank  = c(f"#{i+1}", YELLOW if i == 0 else DIM)
+        score = c(str(cand["score"]), GREEN if i == 0 else DIM)
+        print(f"  {rank}  {c(cand['column'], WHITE if i == 0 else DIM):<25} score={score}")
+        if cand["signals"]:
+            print(f"      {c(' | '.join(cand['signals'][:2]), DIM)}")
+        print()
+
+def cmd_network(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Correlation Network: {path}", CYAN))
+    print(SEPARATOR)
+
+    data   = safe_load(path)
+    result = build_correlation_network(data, threshold=0.3)
+
+    print()
+    print(f"  {c(result['summary'], DIM)}")
+    print()
+    print(f"  Nodes : {c(str(len(result['nodes'])), CYAN)} columns")
+    print(f"  Edges : {c(str(result['stats']['total_edges']), CYAN)} relationships")
+    print(f"  Strong: {c(str(result['stats']['strong']), GREEN)}  "
+          f"Moderate: {c(str(result['stats']['moderate']), YELLOW)}  "
+          f"Weak: {c(str(result['stats']['weak']), DIM)}")
+    print()
+
+    if result["edges"]:
+        print(c("  ── Relationships (sorted by strength) ───────────────", CYAN))
+        print()
+        for e in result["edges"]:
+            strength = e["strength"]
+            if strength >= 0.7:
+                color = GREEN
+                level = "strong"
+            elif strength >= 0.5:
+                color = YELLOW
+                level = "moderate"
+            else:
+                color = DIM
+                level = "weak"
+
+            bar = c("█" * int(strength * 20) + "░" * (20 - int(strength * 20)), color)
+            print(f"  {c(e['source'], WHITE)} ↔ {c(e['target'], WHITE)}")
+            print(f"     {bar}  {c(str(strength), color)}  {c(level, color)}  {c(e['method'], DIM)}")
+            print()
+    else:
+        print(c("  ✓ No significant relationships found.", GREEN))
+    print()
+
 
 def cmd_interactive() -> None:
     banner()
@@ -648,11 +911,17 @@ def cmd_interactive() -> None:
             "11": ("AI smart suggestions",       "suggest"),
             "12": ("Data memory & history",      "memory"),
             "13": ("Drift detection",            "drift"),
+            "14": ("Auto feature engineering", "engineer"),
+            "15": ("Target column detection", "target"),
+            "16": ("Correlation network", "network"),
+            "17": ("Smart Encoding Advisor", "encoding"),
+            "18": ("Schema Validator", "schema"),
+
         }
         for key, (label, _) in options.items():
             print(f"  {c(key, YELLOW)}. {label}")
 
-        choice = input(c("\n  Your choice (1-13): ", YELLOW)).strip()
+        choice = input(c("\n  Your choice (1-18): ", YELLOW)).strip()
         action = options.get(choice, ("", "inspect"))[1]
 
         strategy = "mean"
@@ -699,6 +968,16 @@ def cmd_interactive() -> None:
             cmd_memory([])
         elif action == "drift":
             print(c("\n  For drift: python cli.py drift <baseline> <current>\n", YELLOW))
+        elif action == "engineer":
+            cmd_engineer(file_args)
+        elif action == "target":
+            cmd_target(file_args)
+        elif action == "network":
+            cmd_network(file_args)
+        elif action == "encoding":
+            cmd_encoding(file_args)
+        elif action == "schema":
+            cmd_schema(file_args)
 
         print(c("  ✓ Done! Ready for next operation.", GREEN))
         print(SEPARATOR)
@@ -721,6 +1000,11 @@ COMMANDS = {
     "suggest":    cmd_suggest,
     "memory":     cmd_memory,
     "drift":      cmd_drift,
+    "engineer":   cmd_engineer,
+    "target":     cmd_target,
+    "network":    cmd_network,
+    "encoding":   cmd_encoding,
+    "schema":     cmd_schema,
 }
 
 
