@@ -1,323 +1,222 @@
-# ✨ openAuton
+# 🩺 dataDoctor — Autonomous Data Inspection Agent
 
-**openAuton** is a sophisticated self-improving autonomous AI engineer that continuously evolves through experience. It combines meta-cognition, genetic algorithms, and multi-tool capability to accomplish complex tasks with minimal human intervention.
+> Drop your data. Get answers.
 
-## 🚀 Features
+**dataDoctor** is an open-source autonomous agent that inspects, cleans, and prepares your data for Machine Learning — in seconds.
 
-- **Self-Evolution**: Uses genetic algorithms to evolve its own DNA and improve over time
-- **Meta-Cognition**: Reflects on its own actions and generates insights for improvement
-- **Multi-Tool Agent**: Web search, file operations, code execution, data analysis
-- **Learning from Experience**: Records episodes and learns patterns for future tasks
-- **Real-time Web UI**: Interactive dashboard for monitoring and controlling the agent
-- **Data Training**: Built-in capability to train on CSV data for specialized tasks
-- **Adaptive Strategy**: Dynamically adjusts approach based on task difficulty and available tools
+No code required. Just upload your file.
 
-## 📋 Quick Start
+---
 
-### Prerequisites
-- Python 3.11+
-- pip / venv
+## ✨ Features
 
-### Installation
+| Feature | Description |
+|---------|-------------|
+| 🔍 **Smart Inspection** | Missing values, duplicates, outliers, column stats |
+| 🧹 **Auto Cleaning** | Fill missing values, remove duplicates |
+| 📊 **HTML Reports** | Professional reports you can share |
+| 🤖 **ML Readiness Score** | Know if your data is ready for ML |
+| 🔗 **Relationship Detector** | Find correlations between columns |
+| ⚡ **Data Preparation** | Encode + scale data for ML in one step |
+| 📉 **Drift Detection** | Compare two datasets and find what changed |
+| 🧠 **Data Memory** | Track inspection history across sessions |
+| 💡 **AI Suggestions** | Get smart recommendations from any LLM |
+| 🌐 **Web UI** | Beautiful browser interface — no Terminal needed |
+
+**Supported file formats:** CSV · Excel (.xlsx) · JSON
+
+---
+
+## 🚀 Quick Start
+
+### Option 1 — Web UI (Recommended for most users)
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/openAuton.git
-cd openAuton
+# 1. Install dependencies
+pip install -r requirements.txt
 
-# Create virtual environment
-python -m venv .venv
+# 2. Launch the web app
+streamlit run app.py
+```
 
-# Activate it
-# On Windows:
-.venv\Scripts\Activate.ps1
-# On macOS/Linux:
-source .venv/bin/activate
+Your browser will open automatically at `http://localhost:8501`
 
-# Install dependencies
+Upload any CSV, Excel, or JSON file and explore your data instantly.
+
+---
+
+### Option 2 — CLI (For developers)
+
+```bash
+# Full inspection report
+python cli.py inspect examples/sample_sales.csv
+
+# Interactive mode (guided, no flags needed)
+python cli.py interactive
+
+# See all commands
+python cli.py --help
+```
+
+---
+
+## 📦 Installation
+
+**Requirements:** Python 3.11+
+
+```bash
+git clone https://github.com/Denterio1/dataDoctor.git
+cd dataDoctor
 pip install -r requirements.txt
 ```
 
-### Running the Agent
+---
+
+## 🖥️ Web UI Guide
+
+1. Run `streamlit run app.py`
+2. Upload your file in the sidebar
+3. Explore 8 tabs:
+
+| Tab | What you get |
+|-----|-------------|
+| 📊 Overview | Data preview + column type chart |
+| 🔍 Quality | Missing values + outlier charts |
+| 📈 Statistics | Interactive histograms per column |
+| 🤖 ML Readiness | Score + detailed checks |
+| 🔗 Relationships | Correlation heatmap |
+| 🧹 Cleaning | Clean + download your data |
+| 📉 Drift | Compare two datasets |
+| 📂 Multi-File | Analyse and compare multiple files |
+
+---
+
+## ⌨️ CLI Commands
 
 ```bash
-# Start the web server
-python web/app.py
-
-# Server will be available at http://127.0.0.1:8000
+python cli.py inspect    <file>              # Full report
+python cli.py clean      <file>              # Clean data
+python cli.py stats      <file>              # Column statistics
+python cli.py missing    <file>              # Missing values
+python cli.py duplicates <file>              # Duplicate rows
+python cli.py outliers   <file>              # Outlier detection
+python cli.py export     <file>              # Export cleaned CSV
+python cli.py report     <file>              # HTML report
+python cli.py ml         <file>              # ML Readiness Score
+python cli.py prepare    <file>              # Prepare for ML
+python cli.py relations  <file>              # Column relationships
+python cli.py suggest    <file>              # AI suggestions
+python cli.py memory     list                # Show tracked files
+python cli.py memory     compare <file>      # Compare last 2 runs
+python cli.py drift      <baseline> <current># Drift detection
+python cli.py interactive                    # Guided mode
 ```
 
-## 🎯 Usage Examples
-
-### Via Web UI
-
-1. Open http://127.0.0.1:8000 in your browser
-2. Chat with openAuton in the sidebar
-3. Watch in real-time as it plans and executes tasks
-4. Monitor its learning progress and DNA evolution
-
-### Training on Custom Data
-
-1. Prepare a CSV file with your data
-2. Use the "Train on File" feature in the web UI
-3. openAuton will analyze the data and train a specialized model
-4. View accuracy metrics and generated episodes
-
-**Example CSV Structure:**
-```
-id,product_name,review_text,rating,verified_purchase,helpful_votes,review_date,category,price,customer_verified
-1,Laptop X1,Great product,5,true,42,2024-01-15,Electronics,999.99,true
-2,Mouse Pro,Works well,4,true,15,2024-01-16,Electronics,29.99,true
-...
+**Options:**
+```bash
+--strategy mean    # Fill missing with mean (default)
+--strategy median  # Fill missing with median
+--strategy mode    # Fill missing with most frequent value
+--strategy drop    # Drop rows with missing values
+--no-dedup         # Keep duplicate rows
 ```
 
-### API Endpoints
+---
 
-- `POST /api/chat` - Send a task to the agent
-- `POST /api/train-file` - Upload CSV for training
-- `GET /api/memory` - View learning episodes
-- `GET /api/dna` - View current agent genes
-- `GET /api/status` - Get agent status
+## 💡 AI Suggestions Setup
+
+dataDoctor supports any OpenAI-compatible API. Create a `.env` file:
+
+```env
+# Groq (free) — recommended
+DATADOCTOR_API_KEY=your_groq_key
+DATADOCTOR_BASE_URL=https://api.groq.com/openai/v1
+DATADOCTOR_MODEL=llama-3.3-70b-versatile
+
+# Google Gemini (free)
+# DATADOCTOR_API_KEY=your_gemini_key
+# DATADOCTOR_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+# DATADOCTOR_MODEL=gemini-1.5-flash
+
+# OpenAI (paid)
+# DATADOCTOR_API_KEY=your_openai_key
+# DATADOCTOR_BASE_URL=https://api.openai.com/v1
+# DATADOCTOR_MODEL=gpt-4o-mini
+```
+
+Get a free Groq API key at [console.groq.com](https://console.groq.com)
+
+---
 
 ## 📁 Project Structure
 
 ```
-openAuton/
-├── web/
-│   ├── app.py              # FastAPI application & web UI
-│   └── static/             # Frontend assets
+dataDoctor/
+├── app.py                  ← Web UI (Streamlit)
+├── cli.py                  ← Command line interface
+├── requirements.txt
+├── .env                    ← API keys (not committed)
+│
 ├── src/
 │   ├── core/
-│   │   ├── agent.py        # Main agent orchestrator
-│   │   ├── meta_agent.py   # Meta-cognition system
-│   │   └── intuition.py    # Pattern matching engine
-│   ├── genome/             # Genetic algorithm & DNA evolution
-│   ├── experience/         # Episode recording system
-│   ├── memory/             # Long-term experience memory
-│   ├── llm/                # LLM provider integration
-│   ├── tools/              # Multi-tool registry
-│   └── training/           # Model training pipeline
-├── experiments/
-│   ├── episodes/           # Recorded learning episodes (JSON)
-│   ├── dna_snapshots/      # DNA evolution history (YAML)
-│   ├── universal_models/   # Trained models
-│   └── uploads/            # Uploaded datasets
-├── tests/                  # Test suite
-├── scripts/                # Utility scripts
-├── config/                 # Configuration files
-│   └── prompts/            # LLM prompts for agent behavior
-└── requirements.txt        # Python dependencies
+│   │   └── agent.py        ← Main DataDoctor agent
+│   ├── data/
+│   │   ├── loader.py       ← CSV / Excel / JSON reader
+│   │   ├── analyzer.py     ← Quality checks & statistics
+│   │   ├── cleaner.py      ← Missing values & deduplication
+│   │   ├── ml_readiness.py ← ML Readiness Score
+│   │   ├── relationships.py← Column relationship detector
+│   │   ├── preparator.py   ← ML data preparation pipeline
+│   │   ├── drift.py        ← Data drift detection
+│   │   ├── memory.py       ← Persistent inspection history
+│   │   └── ai_suggestions.py ← AI-powered recommendations
+│   └── report.py           ← HTML report generator
+│
+├── tests/
+│   └── test_datadoctor.py  ← 38 pytest tests
+│
+└── examples/
+    ├── sample_sales.csv
+    ├── sample_employees.xlsx
+    └── sample_products.json
 ```
-
-## 🧠 How It Works
-
-### The Agent Loop
-
-openAuton operates in a continuous cycle:
-
-1. **Observe** → Understand task requirements
-2. **Plan** → Decide which tools to use
-3. **Verify** → Check if tools are available
-4. **Act** → Execute the tools
-5. **Reflect** → Analyze what went well/poorly
-6. **Evolve** → Generate genetic mutations for improvement
-7. **Store** → Record episode for future learning
-
-### Meta-Cognition
-
-The meta-learning system operates at two levels:
-- **Task Agent**: Executes specific tasks
-- **Meta Agent**: Observes task agent performance and suggests improvements
-
-This creates a hierarchy where the agent can improve itself by analyzing its own behavior.
-
-### Genetic Evolution
-
-The agent's "DNA" encodes:
-- Tool usage preferences
-- Risk assessment thresholds
-- Learning rate parameters
-- Communication style
-
-These genes mutate based on task success/failure, creating a lineage of progressively better agents.
-
-## 📊 Example Results
-
-**Sentiment Analysis Training** (on 2000 samples):
-- Accuracy: 91.86%
-- Training Time: <1 minute
-- Tools Used: Data preprocessing, model training, evaluation
-- Episode Recorded: Successfully stored for future learning
-
-## 🔧 Configuration
-
-Edit `config/agent_dna.yaml` to customize:
-- `budget_usd`: Maximum cost for tool usage
-- `auto_save`: Auto-save episodes
-- `verbose`: Debug logging level
-- `risk_thresholds`: Task execution thresholds
-
-Edit prompts in `config/prompts/` to modify agent behavior:
-- `observe.txt`: Observation strategy
-- `plan.txt`: Planning approach
-- `reflect.txt`: Reflection prompts
-- `evolve.txt`: Evolution guidelines
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-python -m pytest tests/
-
-# Run specific test file
-python -m pytest tests/test_all.py -v
-
-# Run with coverage
-pytest --cov=src tests/
-```
-
-## 📝 API Documentation
-
-### POST /api/chat
-
-Send a task to the agent.
-
-**Request:**
-```json
-{
-  "task": "Analyze this CSV file and tell me the main insights",
-  "files": []
-}
-```
-
-**Response:**
-```json
-{
-  "response": "Agent's response here",
-  "episode_id": "abc123",
-  "tools_used": ["web_search", "code_execution"],
-  "status": "success"
-}
-```
-
-### POST /api/train-file
-
-Upload CSV and train a model.
-
-**Request:** (multipart/form-data)
-- `file`: CSV file
-- `epochs`: Number of training epochs (optional, default: 10)
-
-**Response:**
-```json
-{
-  "episode_id": "train_123",
-  "accuracy": 0.919,
-  "samples": 2000,
-  "training_time": 0.45
-}
-```
-
-### GET /api/memory
-
-Get agent's learning episodes.
-
-**Response:**
-```json
-{
-  "total_episodes": 25,
-  "recent_episodes": [...],
-  "success_rate": 0.88
-}
-```
-
-### GET /api/dna
-
-View current agent genes.
-
-**Response:**
-```json
-{
-  "generation": 15,
-  "genes": {
-    "risk_threshold": 0.7,
-    "tool_preference": {...},
-    "learning_rate": 0.01
-  }
-}
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🙋 Support
-
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/yourusername/openAuton/issues)
-- **Discussions**: Join conversations on [GitHub Discussions](https://github.com/yourusername/openAuton/discussions)
-- **Documentation**: Full docs at [Wiki](https://github.com/yourusername/openAuton/wiki)
-
-## 🎓 Learning Resources
-
-- [Architecture Overview](docs/architecture.md)
-- [Agent DNA System](docs/dna.md)
-- [Adding Custom Tools](docs/tools.md)
-- [Training Custom Models](docs/training.md)
-
-## 🚀 Roadmap
-
-- [ ] Web UI dashboard with real-time charts
-- [ ] Multi-agent collaboration
-- [ ] Plugin system for custom tools
-- [ ] Cloud deployment templates (Docker, Kubernetes)
-- [ ] Advanced memory systems (RAG)
-- [ ] Benchmark suite for agent evaluation
-- [ ] Integration with popular APIs (OpenAI, Anthropic, etc.)
-
-## ⚡ Performance
-
-- **Startup Time**: ~2 seconds
-- **Task Execution**: 1-30 seconds (depends on complexity)
-- **Memory Usage**: ~500MB (base) + data-dependent
-- **GPU Support**: PyTorch optimized for CUDA/cuDNN
-
-## 🔐 Security
-
-- No sensitive data is logged by default
-- Episodes are stored locally
-- API endpoints have no built-in authentication (add reverse proxy in production)
-- Recommend using environment variables for API keys
-
-## 📅 Changelog
-
-### v1.0.0 (Initial Release)
-- Core agent framework
-- Meta-cognition system
-- Genetic algorithm evolution
-- Web UI dashboard
-- CSV training capability
-- Multi-tool integration
-
-## 🙏 Acknowledgments
-
-This project combines research from:
-- Evolutionary algorithms (genetic programming)
-- Meta-learning (learning to learn)
-- Reinforcement learning (experience-based improvement)
-- Natural language processing (task understanding)
 
 ---
 
-**Happy automating!** 🤖✨
+## 🧪 Running Tests
 
-For questions or suggestions, please open an issue or discussion on GitHub.
+```bash
+pytest tests/ -v
+```
+
+38 tests — all passing.
+
+---
+
+## 🗺️ Roadmap
+
+| Version | Features |
+|---------|----------|
+| **v0.1.0** ✅ | Core inspection, cleaning, ML prep, web UI |
+| **v0.2.0** | Auto Feature Engineering, Schema Validator |
+| **v0.3.0** | ML Baseline, Feature Importance, Pipeline Export |
+| **v0.4.0** | Database Connector, REST API, Parquet support |
+| **v1.0.0** | Docker, Cloud Deploy, Plugin System |
+
+---
+
+## 📄 License
+
+MIT — free to use, modify, and distribute.
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome! For major changes, please open an issue first.
+
+1. Fork the repo
+2. Create your branch: `git checkout -b feature/amazing-feature`
+3. Commit: `git commit -m 'feat: add amazing feature'`
+4. Push: `git push origin feature/amazing-feature`
+5. Open a Pull Request
