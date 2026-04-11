@@ -174,7 +174,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(
         "<div style='font-family:DM Mono,monospace;font-size:11px;color:#7a7875'>"
-        "dataDoctor v0.1.0<br>Open Source</div>",
+        "dataDoctor v0.2.0<br>Open Source</div>",
         unsafe_allow_html=True,
     )
 
