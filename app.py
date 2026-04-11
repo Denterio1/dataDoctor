@@ -15,12 +15,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 from io import StringIO, BytesIO
 
+
+
+from src.data.encoding_advisor  import encoding_advisor
+from src.data.schema_validator  import validate_schema, infer_schema, schema_to_dict, schema_from_dict
+from src.data.relationships     import detect_relationships
+from src.data.ml_readiness      import ml_readiness
+from src.data.preparator        import prepare_for_ml
+
+from src.data.analyzer import full_report, detect_outliers
 from src.data.loader       import load_file
-from src.data.analyzer     import full_report, detect_outliers
 from src.data.cleaner      import handle_missing, remove_duplicates
-from src.data.ml_readiness import ml_readiness
-from src.data.relationships import detect_relationships
-from src.data.preparator   import prepare_for_ml
 from src.data.drift        import detect_drift
 from src.core.agent        import DataDoctor
 
@@ -260,7 +265,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tabs = st.tabs(["📊 Overview", "🔍 Quality", "📈 Statistics", "🤖 ML Readiness", "🔗 Relationships", "🧹 Cleaning", "📉 Drift"])
+tabs = st.tabs(["📊 Overview", "🔍 Quality", "📈 Statistics", "🤖 ML Readiness", "🔗 Relationships", "🧹 Cleaning", "📉 Drift", "📂 Multi-File", "🔬 Lab"])
 
 # ── Tab 1: Overview ───────────────────────────────────────────────────────────
 with tabs[0]:
@@ -499,3 +504,213 @@ with tabs[6]:
         if drift_result["stable_columns"]:
             st.markdown("#### Stable Columns")
             st.success(", ".join(drift_result["stable_columns"]))
+
+# ── Tab 9: Lab ────────────────────────────────────────────────────────────────
+with tabs[8]:
+    st.markdown("## 🔬 Lab — Advanced Features")
+    st.markdown("---")
+
+    feature = st.selectbox("Choose a feature:", [
+        "⚙️ Auto Feature Engineering",
+        "🎯 Target Column Detection",
+        "🕸️ Correlation Network Graph",
+        "🔤 Smart Encoding Advisor",
+        "📋 Data Schema Validator",
+    ])
+
+    st.markdown("---")
+
+    # ── Auto Feature Engineering ──────────────────────────────────────────────
+    if feature == "⚙️ Auto Feature Engineering":
+        st.markdown("### ⚙️ Auto Feature Engineering")
+        from src.data.preparator import prepare_for_ml
+
+        prepared, log = prepare_for_ml(data, missing_strategy=missing_strategy)
+
+        st.markdown("#### New Features Created")
+        original_cols = set(data["df"].columns)
+        new_cols = [c for c in prepared["df"].columns if c not in original_cols]
+
+        if new_cols:
+            st.success(f"✓ Created {len(new_cols)} new feature(s)")
+            st.dataframe(prepared["df"][new_cols].head(10), use_container_width=True)
+        else:
+            st.info("No new features generated for this dataset.")
+
+        st.markdown("#### Full Prepared Dataset")
+        st.dataframe(prepared["df"].head(20), use_container_width=True)
+
+        csv_b = prepared["df"].to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Download Prepared Dataset",
+            data=csv_b,
+            file_name=f"{os.path.splitext(uploaded.name)[0]}_features.csv",
+            mime="text/csv",
+        )
+
+    # ── Target Column Detection ───────────────────────────────────────────────
+    elif feature == "🎯 Target Column Detection":
+        st.markdown("### 🎯 Target Column Detection")
+        from src.data.ml_readiness import ml_readiness
+        from src.data.analyzer import detect_outliers
+
+        outliers = detect_outliers(data)
+        ml = ml_readiness(data, outliers)
+        df = data["df"]
+
+        numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+
+        if not numeric_cols:
+            st.warning("No numeric columns found for target detection.")
+        else:
+            scores = {}
+            for col in numeric_cols:
+                n_unique = df[col].nunique()
+                null_pct = df[col].isna().mean()
+                is_id = n_unique == len(df)
+                score = 0
+                if not is_id:
+                    score += 30
+                if null_pct < 0.05:
+                    score += 20
+                if n_unique > 5:
+                    score += 20
+                if df[col].std() > 0:
+                    score += 30
+                scores[col] = score
+
+            scores_df = pd.DataFrame([
+                {"Column": col, "Score": sc, "Unique": df[col].nunique(),
+                 "Null %": f"{df[col].isna().mean():.1%}",
+                 "Std": round(float(df[col].std()), 3)}
+                for col, sc in sorted(scores.items(), key=lambda x: -x[1])
+            ])
+
+            st.dataframe(scores_df, use_container_width=True)
+
+            best = max(scores, key=scores.get)
+            st.success(f"✓ Recommended target column: **{best}** (score {scores[best]}/100)")
+
+            fig = px.bar(
+                scores_df, x="Column", y="Score",
+                color="Score",
+                color_continuous_scale=["#f06e6e", "#f0c46e", "#c8f06e"],
+                title="Target Column Scores",
+            )
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#e8e6e1")
+            st.plotly_chart(fig, use_container_width=True)
+
+    # ── Correlation Network Graph ─────────────────────────────────────────────
+    elif feature == "🕸️ Correlation Network Graph":
+        st.markdown("### 🕸️ Correlation Network Graph")
+        from src.data.relationships import detect_relationships
+
+        threshold = st.slider("Minimum correlation strength:", 0.1, 0.9, 0.4, 0.05)
+        rels = detect_relationships(data, threshold=threshold)
+
+        if not rels:
+            st.info(f"No relationships found above threshold {threshold}.")
+        else:
+            rel_df = pd.DataFrame([{
+                "Column A": r["col_a"],
+                "Column B": r["col_b"],
+                "Strength": r["strength"],
+                "Direction": r["direction"],
+                "Method": r["method"],
+            } for r in rels])
+            st.dataframe(rel_df, use_container_width=True)
+
+            fig = px.scatter(
+                rel_df, x="Column A", y="Column B",
+                size="Strength", color="Strength",
+                color_continuous_scale=["#f06e6e", "#f0c46e", "#c8f06e"],
+                title="Column Relationships",
+                size_max=40,
+            )
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#e8e6e1")
+            st.plotly_chart(fig, use_container_width=True)
+
+    # ── Smart Encoding Advisor ────────────────────────────────────────────────
+    elif feature == "🔤 Smart Encoding Advisor":
+        st.markdown("### 🔤 Smart Encoding Advisor")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            model_type = st.selectbox("Model type:", ["tree", "linear", "neural"])
+        with col2:
+            df = data["df"]
+            numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+            target_col = st.selectbox("Target column (optional):", ["None"] + numeric_cols)
+            target_col = None if target_col == "None" else target_col
+
+        result = encoding_advisor(data, target_col=target_col, model_type=model_type)
+        st.info(result["summary"])
+
+        for r in result["columns"]:
+            risk_color = "green" if r["risk"] == "low" else "orange" if r["risk"] == "medium" else "red"
+            with st.expander(f"**{r['column']}** → {r['strategy']} ({r['cardinality']} cardinality)"):
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Unique Values", r["n_unique"])
+                col2.metric("Entropy", r["entropy"])
+                col3.metric("Imbalance", f"{r['imbalance']}x")
+                if r["target_corr"] is not None:
+                    st.metric("Target Correlation", r["target_corr"])
+                st.markdown(f"**Reason:** {r['reason']}")
+                st.markdown(f"**sklearn:** `{r['sklearn_tip']}`")
+                if r["warnings"]:
+                    for w in r["warnings"]:
+                        st.warning(w)
+                st.code(r["code"], language="python")
+
+        st.markdown("#### 📋 Pipeline Code")
+        st.code(result["pipeline_code"], language="python")
+
+    # ── Data Schema Validator ─────────────────────────────────────────────────
+    elif feature == "📋 Data Schema Validator":
+        st.markdown("### 📋 Data Schema Validator")
+
+        mode = st.radio("Mode:", ["Auto-infer schema", "Upload schema JSON"], horizontal=True)
+
+        if mode == "Upload schema JSON":
+            schema_file = st.file_uploader("Upload schema JSON", type=["json"])
+            if schema_file:
+                import json
+
+                schema = schema_from_dict(json.load(schema_file))
+            else:
+                st.info("Please upload a schema JSON file.")
+                st.stop()
+        else:
+            schema = infer_schema(data)
+            schema_json = schema_to_dict(schema)
+            st.markdown("#### Inferred Schema")
+            st.json(schema_json)
+
+            import json
+
+            st.download_button(
+                label="⬇️ Download Schema JSON",
+                data=json.dumps(schema_json, indent=2).encode("utf-8"),
+                file_name=f"{os.path.splitext(uploaded.name)[0]}_schema.json",
+                mime="application/json",
+            )
+
+        result = validate_schema(data, schema)
+
+        valid_color = "success" if result["valid"] else "error"
+        if result["valid"]:
+            st.success(result["summary"])
+        else:
+            st.error(result["summary"])
+
+        for r in result["results"]:
+            if r["status"] == "pass":
+                with st.expander(f"✅ {r['column']}"):
+                    for p in r["passed"]:
+                        st.markdown(f"✓ {p}")
+            else:
+                with st.expander(f"❌ {r['column']}", expanded=True):
+                    for e in r["errors"]:
+                        st.error(e)
+                    for w in r["warnings"]:
+                        st.warning(w)
