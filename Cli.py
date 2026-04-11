@@ -31,7 +31,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
-
+from src.data.pipeline_export import export_pipeline
+from src.data.imbalance_detector import detect_imbalance
+from src.data.split_advisor import advise_split
+from src.data.feature_importance import compute_feature_importance
+from src.data.auto_ml import run_auto_ml
 from src.data.schema_validator import validate_schema, infer_schema, schema_to_dict, schema_from_dict, FieldSchema
 from src.data.encoding_advisor import encoding_advisor
 from src.data.correlation_network import build_correlation_network
@@ -877,6 +881,277 @@ def cmd_network(args: list[str]) -> None:
         print(c("  ✓ No significant relationships found.", GREEN))
     print()
 
+def cmd_automl(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Auto ML Baseline: {path}", CYAN))
+    print(SEPARATOR)
+
+    data = safe_load(path)
+
+    print()
+    target = input(c("  Target column name: ", YELLOW)).strip()
+    task   = input(c("  Task type (auto/classification/regression): ", YELLOW)).strip() or "auto"
+
+    print()
+    print(c("  Training 5 models with cross-validation...", DIM))
+    print()
+
+    try:
+        result = run_auto_ml(data, target_col=target, task_type=task)
+
+        print(c(f"  ── Results ({result['task_type'].upper()}) ──────────────────────────────", CYAN))
+        print()
+        print(f"  {c('Target', BOLD)}   : {c(result['target'], CYAN)}")
+        print(f"  {c('Rows', BOLD)}     : {c(str(result['n_rows']), WHITE)}")
+        print(f"  {c('Features', BOLD)} : {c(str(result['n_features']), WHITE)}")
+        print(f"  {c('Metric', BOLD)}   : {c(result['best_metric'], WHITE)}")
+        print()
+
+        for i, r in enumerate(result["results"]):
+            if r["status"] == "failed":
+                print(f"  {'#'+str(i+1):<4} {c(r['model'], DIM):<25} {c('failed', RED)}")
+                continue
+
+            score = r["score"]
+            color = GREEN if score >= 0.8 else YELLOW if score >= 0.6 else RED
+            bar_w = int(score * 20)
+            bar   = c("█" * bar_w + "░" * (20 - bar_w), color)
+            crown = " 🏆" if i == 0 else ""
+
+            print(f"  {'#'+str(i+1):<4} {c(r['model'], WHITE if i==0 else DIM):<25} "
+                  f"{bar}  {c(f'{score:.4f}', color)} ± {c(str(r['std']), DIM)}{crown}")
+
+        print()
+        print(c("  ── Best Model ───────────────────────────────────────", CYAN))
+        print(f"  {c(result['best_model'], GREEN + BOLD)}")
+        print(f"  {c(result['best_metric'], DIM)} = {c(str(result['best_score']), GREEN)} "
+              f"± {c(str(result['best_std']), DIM)}")
+        print()
+        print(c("  ── Recommendation ───────────────────────────────────", CYAN))
+        print(f"  {c(result['recommendation'], WHITE)}")
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()
+
+def cmd_importance(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Feature Importance (SHAP): {path}", CYAN))
+    print(SEPARATOR)
+
+    data   = safe_load(path)
+    print()
+    target = input(c("  Target column name: ", YELLOW)).strip()
+    task   = input(c("  Task type (auto/classification/regression): ", YELLOW)).strip() or "auto"
+
+    print()
+    print(c("  Computing SHAP values...", DIM))
+    print()
+
+    try:
+        result = compute_feature_importance(data, target_col=target, task_type=task)
+
+        print(c(f"  ── Feature Importance [{result['method'].upper()}] ────────────────────", CYAN))
+        print(f"  Target  : {c(result['target'], CYAN)}")
+        print(f"  Method  : {c(result['method'].upper(), YELLOW)}")
+        print(f"  Summary : {c(result['summary'], DIM)}")
+        print()
+
+        for i, f in enumerate(result["features"]):
+            pct   = f["pct"]
+            color = GREEN if pct >= 20 else YELLOW if pct >= 10 else DIM
+            bar_w = int(pct / 5)
+            bar   = c("█" * bar_w + "░" * (20 - bar_w), color)
+            rank  = c(f"#{i+1}", YELLOW if i == 0 else DIM)
+
+            print(f"  {rank:<5} {c(f['feature'], WHITE if i < 3 else DIM):<25} "
+                  f"{bar}  {c(f'{pct:.1f}%', color)}")
+
+        print()
+        print(c(f"  🏆 Most important: {result['top_feature']}", GREEN))
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()
+
+def cmd_split(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Train/Test Split Advisor: {path}", CYAN))
+    print(SEPARATOR)
+
+    data   = safe_load(path)
+    print()
+    target = input(c("  Target column name: ", YELLOW)).strip()
+    task   = input(c("  Task type (auto/classification/regression): ", YELLOW)).strip() or "auto"
+    print()
+
+    try:
+        result = advise_split(data, target_col=target, task_type=task)
+
+        print(c(f"  ── Recommendation ───────────────────────────────────", CYAN))
+        print()
+        print(f"  {c('Strategy', BOLD)}  : {c(result['strategy'], GREEN)}")
+        print(f"  {c('Task', BOLD)}      : {c(result['task_type'], CYAN)}")
+        print(f"  {c('Dataset', BOLD)}   : {c(str(result['n_rows']), WHITE)} rows")
+        print(f"  {c('Train', BOLD)}     : {c(str(int(result['train_size']*100))+'%', GREEN)}")
+        print(f"  {c('Test', BOLD)}      : {c(str(int(result['test_size']*100))+'%', YELLOW)}")
+        print(f"  {c('CV Folds', BOLD)}  : {c(str(result['cv_folds']), WHITE)}")
+        print(f"  {c('Stratify', BOLD)}  : {c(str(result['stratify']), GREEN if result['stratify'] else DIM)}")
+        print()
+
+        if result["warnings"]:
+            print(c("  ── Warnings ─────────────────────────────────────────", YELLOW))
+            for w in result["warnings"]:
+                print(f"  {c('⚠', YELLOW)} {c(w, WHITE)}")
+            print()
+
+        if result["recommendations"]:
+            print(c("  ── Recommendations ──────────────────────────────────", CYAN))
+            for r in result["recommendations"]:
+                print(f"  {c('→', CYAN)} {c(r, WHITE)}")
+            print()
+
+        print(c("  ── Ready-to-use Code ────────────────────────────────", CYAN))
+        print()
+        for line in result["code"].splitlines():
+            print(f"  {c(line, DIM)}")
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()
+
+def cmd_imbalance(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Class Imbalance Detector: {path}", CYAN))
+    print(SEPARATOR)
+
+    data   = safe_load(path)
+    print()
+    target = input(c("  Target column name: ", YELLOW)).strip()
+    print()
+
+    try:
+        result = detect_imbalance(data, target_col=target)
+
+        sev_color = {
+            "none":     GREEN,
+            "mild":     YELLOW,
+            "moderate": YELLOW,
+            "severe":   RED,
+            "extreme":  RED,
+        }.get(result["severity"], DIM)
+
+        print(c("  ── Class Distribution ───────────────────────────────", CYAN))
+        print()
+        for cls, info in result["class_dist"].items():
+            bar_w = int(info["pct"] / 5)
+            bar   = c("█" * bar_w + "░" * (20 - bar_w), GREEN if info["pct"] > 30 else YELLOW)
+            print(f"  {c(str(cls), WHITE):<20} {bar}  {c(str(info['count']), WHITE)} ({info['pct']}%)")
+        print()
+
+        print(f"  {c('Severity', BOLD)}        : {c(result['severity'].upper(), sev_color)}")
+        print(f"  {c('Imbalance ratio', BOLD)}  : {c(str(result['imbalance_ratio'])+':1', sev_color)}")
+        print(f"  {c('Majority class', BOLD)}   : {c(result['majority_class'], WHITE)}")
+        print(f"  {c('Minority class', BOLD)}   : {c(result['minority_class'], WHITE)}")
+        print()
+
+        if result["warnings"]:
+            print(c("  ── Warnings ─────────────────────────────────────────", YELLOW))
+            for w in result["warnings"]:
+                print(f"  {c('⚠', YELLOW)} {c(w, WHITE)}")
+            print()
+
+        print(c("  ── Recommended Strategy ─────────────────────────────", CYAN))
+        print(f"  {c('🏆 ' + result['recommended'], GREEN)}")
+        print()
+
+        print(c("  ── All Strategies ───────────────────────────────────", CYAN))
+        for s in result["strategies"]:
+            rec = c(" ← recommended", GREEN) if s["recommended"] else ""
+            print(f"\n  {c(s['name'], WHITE + BOLD)}{rec}")
+            print(f"  {c(s['description'], DIM)}")
+            print(f"  Best for: {c(s['best_for'], DIM)}")
+
+        print()
+        print(c("  ── Ready-to-use Code ────────────────────────────────", CYAN))
+        print(f"  {c('Showing code for: ' + result['recommended'], DIM)}\n")
+        for line in result["code"].get(result["recommended"], "").splitlines():
+            print(f"  {c(line, DIM)}")
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()
+
+def cmd_pipeline(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Pipeline Export: {path}", CYAN))
+    print(SEPARATOR)
+
+    data = safe_load(path)
+    print()
+    target = input(c("  Target column name: ", YELLOW)).strip()
+    task   = input(c("  Task type (auto/classification/regression): ", YELLOW)).strip() or "auto"
+
+    print()
+    print(c("  Available models:", BOLD))
+    models = {
+        "1": "random_forest",
+        "2": "gradient_boosting",
+        "3": "logistic",
+        "4": "svm",
+        "5": "knn",
+    }
+    for k, v in models.items():
+        print(f"  {c(k, YELLOW)}. {v.replace('_', ' ').title()}")
+
+    model_choice = input(c("\n  Choose model (1-5, default=1): ", YELLOW)).strip() or "1"
+    model_name   = models.get(model_choice, "random_forest")
+
+    imbalance = input(c("  Handle class imbalance with SMOTE? (y/n, default=n): ", YELLOW)).strip().lower() == "y"
+
+    base, _ = os.path.splitext(path)
+    out_path = f"{base}_pipeline.py"
+
+    print()
+    print(c("  Generating pipeline...", DIM))
+
+    try:
+        result = export_pipeline(
+            data,
+            target_col       = target,
+            task_type        = task,
+            model_name       = model_name,
+            handle_imbalance = imbalance,
+            output_path      = out_path,
+        )
+
+        print()
+        print(c("  ── Pipeline Summary ─────────────────────────────────", CYAN))
+        print(f"  Task       : {c(result['task_type'].upper(), CYAN)}")
+        print(f"  Target     : {c(result['target'], GREEN)}")
+        print(f"  Model      : {c(result['model'].replace('_',' ').title(), WHITE)}")
+        print(f"  Features   : {c(str(result['n_features']), WHITE)} "
+              f"({c(str(result['n_numeric']), CYAN)} numeric, "
+              f"{c(str(result['n_categorical']), YELLOW)} categorical)")
+        print(f"  SMOTE      : {c('Yes', GREEN) if imbalance else c('No', DIM)}")
+        print()
+        print(c(f"  ✓ Pipeline saved to: {out_path}", GREEN))
+        print(c("  ✓ Open the file, change 'your_data.csv' and run it!", CYAN))
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()
+
 
 def cmd_interactive() -> None:
     banner()
@@ -916,12 +1191,17 @@ def cmd_interactive() -> None:
             "16": ("Correlation network", "network"),
             "17": ("Smart Encoding Advisor", "encoding"),
             "18": ("Schema Validator", "schema"),
+            "19": ("Auto ML baseline", "automl"),
+            "20": ("Feature importance (SHAP)", "importance"),
+            "21": ("Train/test split advisor", "split"),
+            "22": ("Class imbalance detector", "imbalance"),
+            "23": ("Pipeline export (sklearn)", "pipeline"),
 
         }
         for key, (label, _) in options.items():
             print(f"  {c(key, YELLOW)}. {label}")
 
-        choice = input(c("\n  Your choice (1-18): ", YELLOW)).strip()
+        choice = input(c("\n  Your choice (1-23): ", YELLOW)).strip()
         action = options.get(choice, ("", "inspect"))[1]
 
         strategy = "mean"
@@ -978,6 +1258,16 @@ def cmd_interactive() -> None:
             cmd_encoding(file_args)
         elif action == "schema":
             cmd_schema(file_args)
+        elif action == "automl":
+            cmd_automl(file_args)
+        elif action == "importance":
+            cmd_importance(file_args)
+        elif action =="split":
+            cmd_split(file_args)
+        elif action == "imbalance":
+            cmd_imbalance(file_args)
+        elif action == "pipeline":
+            cmd_pipeline(file_args)
 
         print(c("  ✓ Done! Ready for next operation.", GREEN))
         print(SEPARATOR)
@@ -1005,6 +1295,11 @@ COMMANDS = {
     "network":    cmd_network,
     "encoding":   cmd_encoding,
     "schema":     cmd_schema,
+    "automl":     cmd_automl,
+    "importance": cmd_importance,
+    "split":      cmd_split,
+    "imbalance":  cmd_imbalance,
+    "pipeline":   cmd_pipeline,
 }
 
 

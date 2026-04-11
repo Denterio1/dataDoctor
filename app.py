@@ -265,7 +265,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tabs = st.tabs(["📊 Overview", "🔍 Quality", "📈 Statistics", "🤖 ML Readiness", "🔗 Relationships", "🧹 Cleaning", "📉 Drift", "📂 Multi-File", "🔬 Lab"])
+tabs = st.tabs(["📊 Overview", "🔍 Quality", "📈 Statistics", "🤖 ML Readiness", "🔗 Relationships", "🧹 Cleaning", "📉 Drift", "📂 Multi-File", "🔬 Lab", "🚀 ML Pipeline"])
 
 # ── Tab 1: Overview ───────────────────────────────────────────────────────────
 with tabs[0]:
@@ -714,3 +714,176 @@ with tabs[8]:
                         st.error(e)
                     for w in r["warnings"]:
                         st.warning(w)
+
+# ── Tab 10: ML Pipeline ────────────────────────────────────────────────────────
+with tabs[9]:
+    st.markdown("#### 🚀 ML Pipeline ")
+    st.markdown("---")
+
+    target_col = st.selectbox(
+        "Select target column",
+        options=data["df"].columns.tolist(),
+        index=len(data["df"].columns) - 1,
+    )
+
+    task_type = st.selectbox(
+        "Task type",
+        ["auto", "classification", "regression"],
+    )
+
+    st.markdown("---")
+
+    col1, col2 = st.columns(2)
+
+    # ── Auto ML ──────────────────────────────────────────────────────────────
+    with col1:
+        st.markdown("##### Auto ML Baseline")
+        if st.button("▶ Run Auto ML"):
+            with st.spinner("Training 5 models..."):
+                try:
+                    from src.data.auto_ml import run_auto_ml
+                    ml_result = run_auto_ml(data, target_col=target_col, task_type=task_type)
+
+                    st.success(f"🏆 Best: **{ml_result['best_model']}**")
+                    st.metric("Best Score", f"{ml_result['best_score']:.4f}")
+                    st.metric("Metric", ml_result['best_metric'])
+                    st.caption(ml_result['recommendation'])
+
+                    results_df = pd.DataFrame([
+                        {"Model": r["model"], "Score": r["score"], "Std": r["std"]}
+                        for r in ml_result["results"] if r["status"] == "success"
+                    ])
+                    fig = px.bar(
+                        results_df, x="Model", y="Score",
+                        color="Score",
+                        color_continuous_scale=["#f06e6e", "#f0c46e", "#c8f06e"],
+                        title="Model comparison",
+                    )
+                    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#e8e6e1")
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+    # ── Feature Importance ────────────────────────────────────────────────────
+    with col2:
+        st.markdown("##### Feature Importance")
+        if st.button("▶ Compute Importance"):
+            with st.spinner("Computing SHAP/Gini importance..."):
+                try:
+                    from src.data.feature_importance import compute_feature_importance
+                    fi_result = compute_feature_importance(data, target_col=target_col, task_type=task_type)
+
+                    st.success(f"🏆 Top feature: **{fi_result['top_feature']}**")
+                    st.caption(f"Method: {fi_result['method'].upper()}")
+
+                    fi_df = pd.DataFrame(fi_result["features"])
+                    fig = px.bar(
+                        fi_df, x="pct", y="feature",
+                        orientation="h",
+                        color="pct",
+                        color_continuous_scale=["#f0c46e", "#c8f06e"],
+                        title="Feature importance (%)",
+                    )
+                    fig.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        font_color="#e8e6e1",
+                        yaxis=dict(autorange="reversed"),
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Error: {e}")
+
+    st.markdown("---")
+    col3, col4 = st.columns(2)
+
+    # ── Split Advisor ─────────────────────────────────────────────────────────
+    with col3:
+        st.markdown("##### Train/Test Split Advisor")
+        if st.button("▶ Get Split Advice"):
+            try:
+                from src.data.split_advisor import advise_split
+                split_result = advise_split(data, target_col=target_col, task_type=task_type)
+
+                st.success(f"Strategy: **{split_result['strategy']}**")
+                st.metric("Train", f"{int(split_result['train_size']*100)}%")
+                st.metric("Test",  f"{int(split_result['test_size']*100)}%")
+                st.metric("CV Folds", split_result['cv_folds'])
+
+                for w in split_result["warnings"]:
+                    st.warning(w)
+                for r in split_result["recommendations"]:
+                    st.info(r)
+
+                st.markdown("**Ready-to-use code:**")
+                st.code(split_result["code"], language="python")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    # ── Class Imbalance ───────────────────────────────────────────────────────
+    with col4:
+        st.markdown("##### Class Imbalance Detector")
+        if st.button("▶ Detect Imbalance"):
+            try:
+                from src.data.imbalance_detector import detect_imbalance
+                imb_result = detect_imbalance(data, target_col=target_col)
+
+                sev_color = {"none": "success", "mild": "warning", "moderate": "warning", "severe": "error", "extreme": "error"}
+                getattr(st, sev_color.get(imb_result["severity"], "info"))(
+                    f"Severity: **{imb_result['severity'].upper()}** — ratio {imb_result['imbalance_ratio']}:1"
+                )
+
+                dist_df = pd.DataFrame([
+                    {"Class": cls, "Count": info["count"], "Pct": info["pct"]}
+                    for cls, info in imb_result["class_dist"].items()
+                ])
+                fig = px.pie(dist_df, names="Class", values="Count", title="Class distribution",
+                             color_discrete_sequence=["#c8f06e", "#5ce0c6", "#f0c46e", "#f06e6e"])
+                fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", font_color="#e8e6e1")
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.success(f"Recommended: **{imb_result['recommended']}**")
+                st.code(imb_result["code"].get(imb_result["recommended"], ""), language="python")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+    st.markdown("---")
+
+    # ── Pipeline Export ───────────────────────────────────────────────────────
+    st.markdown("##### Pipeline Export")
+    col5, col6 = st.columns(2)
+    with col5:
+        model_choice = st.selectbox(
+            "Model",
+            ["random_forest", "gradient_boosting", "logistic", "svm", "knn"],
+        )
+    with col6:
+        handle_imb = st.checkbox("Handle imbalance with SMOTE")
+
+    if st.button("▶ Generate Pipeline"):
+        try:
+            from src.data.pipeline_export import export_pipeline
+            import tempfile, os
+            with tempfile.NamedTemporaryFile(suffix=".py", delete=False, mode="w") as f:
+                tmp_path = f.name
+
+            pip_result = export_pipeline(
+                data,
+                target_col       = target_col,
+                task_type        = task_type,
+                model_name       = model_choice,
+                handle_imbalance = handle_imb,
+                output_path      = tmp_path,
+            )
+
+            st.success(f"✓ Pipeline generated — {pip_result['n_features']} features, {model_choice.replace('_',' ').title()}")
+            st.code(pip_result["code"], language="python")
+
+            st.download_button(
+                label    = "⬇️ Download pipeline.py",
+                data     = pip_result["code"],
+                file_name= f"{os.path.splitext(uploaded.name)[0]}_pipeline.py",
+                mime     = "text/plain",
+            )
+        except Exception as e:
+            st.error(f"Error: {e}")

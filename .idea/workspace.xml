@@ -5,10 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="501a0140-d1c0-42f4-a563-9a9be1872786" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/src/data/auto_ml.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/data/correlation_network.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/data/encoding_advisor.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/data/feature_engineer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/feature_importance.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/imbalance_detector.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/pipeline_export.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/data/schema_validator.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/split_advisor.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/src/data/target_detector.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/Cli.py" afterDir="false" />
