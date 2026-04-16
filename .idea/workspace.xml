@@ -4,29 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="501a0140-d1c0-42f4-a563-9a9be1872786" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/dataDoctor.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/api.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/auth.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/cognitive_dna.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/dna_memory.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/security.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/ux.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.streamlit/config.toml" beforeDir="false" afterPath="$PROJECT_DIR$/.streamlit/config.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/Cli.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/datadoctor_memory.db" beforeDir="false" afterPath="$PROJECT_DIR$/datadoctor_memory.db" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/sample_sales_report.html" beforeDir="false" afterPath="$PROJECT_DIR$/examples/sample_sales_report.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/analyzer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/analyzer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/ml_readiness.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/ml_readiness.py" afterDir="false" />
-    </list>
+    <list default="true" id="501a0140-d1c0-42f4-a563-9a9be1872786" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
