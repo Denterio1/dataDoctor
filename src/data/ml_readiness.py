@@ -35,7 +35,7 @@ def ml_readiness(data: dict[str, Any], outliers: dict) -> dict[str, Any]:
             "summary":  str,
         }
     """
-    df     = data["df"]
+    df     = data["df"] if "df" in data else __import__("pandas").DataFrame(data.get("rows", []))
     checks = []
     total  = 0
 

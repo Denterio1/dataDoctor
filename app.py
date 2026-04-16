@@ -15,8 +15,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from io import StringIO, BytesIO
 
-
-
+from src.ux import render_welcome, render_privacy_tab, render_audit_tab
+from src.security import security, PrivacyManager
+from src.auth import register_or_login, log_session, get_user_stats, is_supabase_configured
 from src.data.encoding_advisor  import encoding_advisor
 from src.data.schema_validator  import validate_schema, infer_schema, schema_to_dict, schema_from_dict
 from src.data.relationships     import detect_relationships
@@ -174,24 +175,41 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(
         "<div style='font-family:DM Mono,monospace;font-size:11px;color:#7a7875'>"
-        "dataDoctor v0.2.0<br>Open Source</div>",
+        "dataDoctor v0.3.0<br>Open Source</div>",
         unsafe_allow_html=True,
     )
 
+# ── Authentication ────────────────────────────────────────────────────────────
+user_email = None
+user_data  = {}
+
+if is_supabase_configured():
+    with st.sidebar:
+        st.markdown("### 👤 Account")
+        email = st.text_input("Email", placeholder="you@example.com", key="user_email")
+        name  = st.text_input("Name (optional)", placeholder="Your name", key="user_name")
+
+        if email and "@" in email:
+            user = register_or_login(email, name)
+            if user:
+                user_email = email
+                stats = get_user_stats(email)
+                st.success(f"Welcome, {user.get('name', email.split('@')[0])}!")
+                if stats:
+                    st.markdown(f"""
+                    <div style='font-family:DM Mono,monospace;font-size:11px;color:#7a7875'>
+                    Sessions : {stats.get('total_sessions', 0)}<br>
+                    Files    : {stats.get('files_analysed', 0)}<br>
+                    Avg ML   : {stats.get('avg_ml_score', 0)}/100<br>
+                    Since    : {stats.get('member_since', '')}
+                    </div>
+                    """, unsafe_allow_html=True)
+        st.markdown("---")
 
 # ── Main area ─────────────────────────────────────────────────────────────────
 
 if not uploaded:
-    st.markdown("""
-    <div style='text-align:center;padding:6rem 2rem'>
-        <div style='font-family:Fraunces,serif;font-size:3.5rem;font-weight:300;color:#e8e6e1;line-height:1.2'>
-            Drop your data.<br><em style='color:#c8f06e'>Get answers.</em>
-        </div>
-        <div style='font-family:DM Mono,monospace;font-size:13px;color:#7a7875;margin-top:1.5rem'>
-            Upload a CSV, Excel, or JSON file in the sidebar to begin.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    render_welcome()
     st.stop()
 
 
@@ -201,8 +219,24 @@ with st.spinner("Analysing your data..."):
     data     = _load_uploaded(uploaded)
     analysis = full_report(data)
     outliers = detect_outliers(data)
+    pm = PrivacyManager()
+    privacy_report = pm.privacy_report(data["df"])
     ml       = ml_readiness(data, outliers) if run_ml else None
     rels     = detect_relationships(data, threshold=0.4) if run_rels else []
+    
+    # Security checks
+    file_bytes = uploaded.getvalue()
+    val_result = security.file_validator.validate(
+        uploaded.name,
+        len(file_bytes),
+        file_bytes
+    )
+    if not val_result.is_valid:
+        for err in val_result.errors:
+            st.error(err)
+        st.stop()
+    for warn in val_result.warnings:
+        st.warning(warn)
 
     # Clean
     clean_data = data
@@ -265,7 +299,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 
-tabs = st.tabs(["📊 Overview", "🔍 Quality", "📈 Statistics", "🤖 ML Readiness", "🔗 Relationships", "🧹 Cleaning", "📉 Drift", "📂 Multi-File", "🔬 Lab", "🚀 ML Pipeline"])
+tabs = st.tabs(["📊 Overview", "🔍 Quality", "🛡️ Privacy", "📈 Statistics", "🤖 ML Readiness", "🔗 Relationships", "🧹 Cleaning", "📉 Drift", "🧬 Cognitive DNA", "📂 Multi-File", "🔬 Lab", "🚀 ML Pipeline", "📋 Audit"])
 
 # ── Tab 1: Overview ───────────────────────────────────────────────────────────
 with tabs[0]:
@@ -319,8 +353,13 @@ with tabs[1]:
             st.plotly_chart(fig, use_container_width=True)
 
 
-# ── Tab 3: Statistics ─────────────────────────────────────────────────────────
+# ── Tab 3: Privacy ────────────────────────────────────────────────────────────
 with tabs[2]:
+    render_privacy_tab(privacy_report, data["df"])
+
+
+# ── Tab 4: Statistics ─────────────────────────────────────────────────────────
+with tabs[3]:
     st.markdown("#### Column Statistics")
     stats = analysis["column_stats"]
 
@@ -363,8 +402,8 @@ with tabs[2]:
         st.plotly_chart(fig, use_container_width=True)
 
 
-# ── Tab 4: ML Readiness ───────────────────────────────────────────────────────
-with tabs[3]:
+# ── Tab 5: ML Readiness ───────────────────────────────────────────────────────
+with tabs[4]:
     if not ml:
         st.info("Enable ML Readiness check in the sidebar.")
     else:
@@ -396,8 +435,8 @@ with tabs[3]:
             st.markdown("---")
 
 
-# ── Tab 5: Relationships ──────────────────────────────────────────────────────
-with tabs[4]:
+# ── Tab 6: Relationships ──────────────────────────────────────────────────────
+with tabs[5]:
     if not run_rels:
         st.info("Enable relationship detection in the sidebar.")
     elif not rels:
@@ -430,8 +469,8 @@ with tabs[4]:
             st.plotly_chart(fig, use_container_width=True)
 
 
-# ── Tab 6: Cleaning ───────────────────────────────────────────────────────────
-with tabs[5]:
+# ── Tab 7: Cleaning ───────────────────────────────────────────────────────────
+with tabs[6]:
     st.markdown("#### Cleaning Log")
     if not clean_log:
         st.success("No cleaning was necessary.")
@@ -469,8 +508,8 @@ with tabs[5]:
     )
 
 
-# ── Tab 7: Drift ──────────────────────────────────────────────────────────────
-with tabs[6]:
+# ── Tab 8: Drift ──────────────────────────────────────────────────────────────
+with tabs[7]:
     if not uploaded_baseline:
         st.info("Upload a baseline file in the sidebar to detect drift.")
     else:
@@ -505,8 +544,88 @@ with tabs[6]:
             st.markdown("#### Stable Columns")
             st.success(", ".join(drift_result["stable_columns"]))
 
-# ── Tab 9: Lab ────────────────────────────────────────────────────────────────
+# ── Tab 9: Cognitive DNA ──────────────────────────────────────────────────────
 with tabs[8]:
+    st.markdown("#### 🧬 Cognitive Data DNA")
+    st.markdown("---")
+    
+    try:
+        from src.data.dna_memory import get_dna_manager
+        from src.data.cognitive_dna import CognitiveDNA, DataDNA
+        
+        target_col_dna = st.selectbox("Target column (optional)", ["None"] + list(data["df"].columns), key="dna_target")
+        target_col_dna = None if target_col_dna == "None" else target_col_dna
+        
+        if st.button("🧬 Generate & Analyze DNA"):
+            with st.spinner("Computing Cognitive DNA..."):
+                dna_obj = CognitiveDNA(data["df"], target_col=target_col_dna)
+                manager = get_dna_manager()
+                
+                dna = DataDNA(
+                    statistical = dna_obj.statistical,
+                    structural  = dna_obj.structural,
+                    ml          = dna_obj.ml,
+                    temporal    = dna_obj.temporal,
+                    dna_hash    = dna_obj.dna_hash,
+                    created_at  = dna_obj.created_at,
+                    source      = uploaded.name,
+                    personality = dna_obj.personality,
+                    tags        = dna_obj.tags
+                )
+                
+                analysis_result = manager.full_analysis(dna, uploaded.name, ml_score=ml["score"] if ml else 0)
+                
+                col_dna1, col_dna2 = st.columns(2)
+                
+                with col_dna1:
+                    st.markdown("##### 🆔 Identity")
+                    st.metric("DNA Hash", analysis_result["dna_hash"])
+                    st.markdown(f"**Personality:** {analysis_result['personality']}")
+                    st.markdown(f"**Tags:** {', '.join(analysis_result['tags'])}")
+                    st.markdown(f"**Total in DB:** {analysis_result['total_in_db']}")
+                    
+                    st.markdown("##### 📈 Evolution")
+                    evo = analysis_result["evolution"]
+                    st.metric("Version", evo.get("version", 1))
+                    st.markdown(f"**Trend:** `{evo.get('trend', 'stable')}`")
+                    st.markdown(f"**ML Trend:** `{evo.get('ml_trend', 'stable')}`")
+                    if evo.get("changes"):
+                        st.markdown("**Key Changes:**")
+                        for ch in evo["changes"]:
+                            st.markdown(f"- {ch}")
+                
+                with col_dna2:
+                    st.markdown("##### 🎯 Strategy Recommendation")
+                    rec = analysis_result["recommendation"]
+                    st.success(f"**{rec['strategy']}**")
+                    st.progress(rec["confidence"])
+                    st.markdown(f"**Confidence:** {int(rec['confidence']*100)}%")
+                    st.markdown(f"**Explanation:** {rec['explanation']}")
+                    if rec.get("based_on"):
+                        st.markdown(f"**Based on:** {', '.join(rec['based_on'])}")
+
+                st.markdown("---")
+                st.markdown("##### 👯 Similar Datasets")
+                similar = analysis_result["similar"]
+                if not similar:
+                    st.info("First time seeing this type of data. No similar datasets found yet.")
+                else:
+                    for s in similar:
+                        col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
+                        col_s1.markdown(f"**{s['source']}**  \n*{s['personality']}*")
+                        col_s2.metric("Similarity", f"{int(s['similarity']*100)}%")
+                        col_s3.metric("ML Score", s["ml_score"])
+                        st.markdown("---")
+    except Exception as e:
+        st.error(f"DNA Analysis Error: {e}")
+
+# ── Tab 10: Multi-File (Placeholder) ───────────────────────────────────────────
+with tabs[9]:
+    st.markdown("#### 📂 Multi-File Analysis")
+    st.info("Multi-file analysis and comparison feature is coming soon in v0.5.0!")
+
+# ── Tab 11: Lab ────────────────────────────────────────────────────────────────
+with tabs[10]:
     st.markdown("## 🔬 Lab — Advanced Features")
     st.markdown("---")
 
@@ -715,8 +834,8 @@ with tabs[8]:
                     for w in r["warnings"]:
                         st.warning(w)
 
-# ── Tab 10: ML Pipeline ────────────────────────────────────────────────────────
-with tabs[9]:
+# ── Tab 12: ML Pipeline ────────────────────────────────────────────────────────
+with tabs[11]:
     st.markdown("#### 🚀 ML Pipeline ")
     st.markdown("---")
 
@@ -887,3 +1006,10 @@ with tabs[9]:
             )
         except Exception as e:
             st.error(f"Error: {e}")
+
+# ── Tab 12: Audit ─────────────────────────────────────────────────────────────
+with tabs[11]:
+    if user_email:
+        render_audit_tab(user_email)
+    else:
+        st.info("Login with your email in the sidebar to see your activity log.")

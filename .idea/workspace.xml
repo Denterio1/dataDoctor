@@ -5,21 +5,27 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="501a0140-d1c0-42f4-a563-9a9be1872786" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/data/auto_ml.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/correlation_network.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/encoding_advisor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/feature_engineer.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/feature_importance.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/imbalance_detector.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/pipeline_export.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/schema_validator.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/split_advisor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/data/target_detector.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.env" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/dataDoctor.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/api.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/auth.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/cognitive_dna.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/dna_memory.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/security.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/ux.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.streamlit/config.toml" beforeDir="false" afterPath="$PROJECT_DIR$/.streamlit/config.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/Cli.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/datadoctor_memory.db" beforeDir="false" afterPath="$PROJECT_DIR$/datadoctor_memory.db" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/sample_sales_report.html" beforeDir="false" afterPath="$PROJECT_DIR$/examples/sample_sales_report.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/analyzer.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/analyzer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data/ml_readiness.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/ml_readiness.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,18 +50,21 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "main"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;
   },
-  "keyToStringList": {
-    "ChangesTree.GroupingKeys": [
-      "repository"
+  &quot;keyToStringList&quot;: {
+    &quot;ChangesTree.GroupingKeys&quot;: [
+      &quot;repository&quot;
     ]
   }
-}]]></component>
+}</component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>

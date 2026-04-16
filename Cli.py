@@ -31,12 +31,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+from src.data.dna_memory import get_dna_manager
+from src.data.cognitive_dna import CognitiveDNA
 from src.data.pipeline_export import export_pipeline
 from src.data.imbalance_detector import detect_imbalance
 from src.data.split_advisor import advise_split
 from src.data.feature_importance import compute_feature_importance
 from src.data.auto_ml import run_auto_ml
-from src.data.schema_validator import validate_schema, infer_schema, schema_to_dict, schema_from_dict, FieldSchema
+from src.data.schema_validator import validate_schema, infer_schema, schema_to_dict, schema_from_dict
 from src.data.encoding_advisor import encoding_advisor
 from src.data.correlation_network import build_correlation_network
 from src.data.target_detector import detect_target
@@ -84,24 +86,51 @@ def usage() -> None:
     banner()
     print(c("  COMMANDS", BOLD + CYAN))
     print()
-    cmds = [
+    
+    print(c("  ── Core Inspection ──────────────────────────────────", CYAN))
+    core_cmds = [
         ("inspect   <file>",   "Full inspection: issues + cleaning + stats + report"),
         ("clean     <file>",   "Clean data (remove dupes + fill missing)"),
         ("stats     <file>",   "Show column statistics only"),
         ("missing   <file>",   "Show missing value counts per column"),
         ("duplicates <file>",  "Detect and show duplicate rows"),
         ("outliers  <file>",   "Detect outliers using IQR method"),
-        ("export    <file>",   "Inspect + export cleaned CSV to disk"),
         ("report    <file>",   "Generate professional HTML report"),
-        ("ml        <file>",   "ML Readiness Score"),
+        ("export    <file>",   "Inspect + export cleaned CSV to disk"),
+    ]
+    for cmd, desc in core_cmds:
+        print(f"  {c('python cli.py', DIM)} {c(cmd, YELLOW)}  {c(desc, DIM)}")
+
+    print()
+    print(c("  ── Machine Learning & Prep ──────────────────────────", CYAN))
+    ml_cmds = [
+        ("ml        <file>",   "ML Readiness Score & detailed checks"),
         ("prepare   <file>",   "Prepare data for ML (encode + scale)"),
-        ("relations <file>",   "Detect column relationships"),
-        ("suggest   <file>",   "AI-powered smart suggestions"),
-        ("memory    [list|compare <file>|clear]", "Data memory & history"),
-        ("drift     <baseline> <current>",        "Detect data drift between two files"),
+        ("target    <file>",   "Auto-detect best target column for ML"),
+        ("split     <file>",   "Train/Test split advisor & code generator"),
+        ("imbalance <file>",   "Class imbalance detector & strategy advisor"),
+        ("encoding  <file>",   "Smart Encoding Advisor for categorical data"),
+        ("importance <file>",  "Feature Importance using SHAP values"),
+        ("automl    <file>",   "Run 5 models to find the best baseline"),
+        ("pipeline  <file>",   "Export full Sklearn/Imblearn pipeline code"),
+    ]
+    for cmd, desc in ml_cmds:
+        print(f"  {c('python cli.py', DIM)} {c(cmd, YELLOW)}  {c(desc, DIM)}")
+
+    print()
+    print(c("  ── Advanced Analysis ────────────────────────────────", CYAN))
+    adv_cmds = [
+        ("relations <file>",   "Detect column relationships & correlations"),
+        ("network   <file>",   "Build & visualize correlation network"),
+        ("engineer  <file>",   "Auto Feature Engineering (Date/Text/Num)"),
+        ("schema    <file>",   "Schema Validator (Infer/Validate/Export)"),
+        ("dna       <file>",   "Cognitive Data DNA (Statistical identity)"),
+        ("drift     <base> <new>", "Detect data drift between two files"),
+        ("suggest   <file>",   "AI-powered smart suggestions (needs .env)"),
+        ("memory    [list|compare|clear]", "Track & compare inspection history"),
         ("interactive",        "Guided interactive mode — no flags needed"),
     ]
-    for cmd, desc in cmds:
+    for cmd, desc in adv_cmds:
         print(f"  {c('python cli.py', DIM)} {c(cmd, YELLOW)}  {c(desc, DIM)}")
 
     print()
@@ -147,9 +176,42 @@ def parse_options(args: list[str]) -> dict:
 def safe_load(path: str) -> dict:
     try:
         return load_csv(path)
+        # Save to DNA memory and get full analysis
+        manager = get_dna_manager()
+        analysis_result = manager.full_analysis(dna, path, ml_score=0)
+
+        print(c("  ── DNA Memory ───────────────────────────────────────", CYAN))
+        print(f"  Total datasets in memory : {c(str(analysis_result['total_in_db']), WHITE)}")
+
+        similar = analysis_result["similar"]
+        if similar:
+            print(f"  Similar datasets found   : {c(str(len(similar)), YELLOW)}")
+            for s in similar[:3]:
+                print(f"     {c(s['source'], WHITE)} — {c(str(int(s['similarity'] * 100)) + '%', GREEN)} similar")
+        else:
+            print(f"  Similar datasets found   : {c('0 (first time)', DIM)}")
+
+        rec = analysis_result["recommendation"]
+        print()
+        print(c("  ── Auto Strategy Recommendation ─────────────────────", CYAN))
+        print(f"  Source     : {c(rec['source'], YELLOW)}")
+        print(f"  Confidence : {c(str(int(rec['confidence'] * 100)) + '%', GREEN)}")
+        print(f"  Strategy   : {c(str(rec['strategy']), WHITE)}")
+        print(f"  Explanation: {c(rec['explanation'], DIM)}")
+
+        evo = analysis_result["evolution"]
+        if not evo.get("is_new"):
+            print()
+            print(c("  ── Evolution ────────────────────────────────────────", CYAN))
+            print(f"  Version : {c(str(evo.get('version', 1)), WHITE)}")
+            print(f"  Trend   : {c(evo.get('trend', 'unknown'), YELLOW)}")
+            print(f"  ML Trend: {c(evo.get('ml_trend', 'unknown'), GREEN)}")
+            if evo.get("changes"):
+                for ch in evo["changes"][:3]:
+                    print(f"  {c('→', CYAN)} {c(ch, WHITE)}")
     except Exception as e:
-        print(c(f"  ✗ Could not load file: {e}", RED))
-        sys.exit(1)
+        print(c(f"  ✗ Error: {e}", RED))
+    print()
 
 
 # ── Commands ──────────────────────────────────────────────────────────────────
@@ -1152,6 +1214,66 @@ def cmd_pipeline(args: list[str]) -> None:
 
     print()
 
+def cmd_dna(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  🧬 Cognitive Data DNA: {path}", CYAN))
+    print(SEPARATOR)
+
+    data   = safe_load(path)
+    print()
+    target = input(c("  Target column (optional, press Enter to skip): ", YELLOW)).strip() or None
+    print()
+    print(c("  Computing DNA...", DIM))
+    print()
+
+    try:
+        dna = CognitiveDNA(data, target_col=target)
+
+        print(c("  ── Identity ─────────────────────────────────────────", CYAN))
+        print(f"  {c('DNA Hash', BOLD)}    : {c(dna.short_hash, GREEN)}")
+        print(f"  {c('Personality', BOLD)} : {c(dna.personality, YELLOW)}")
+        print(f"  {c('Tags', BOLD)}        : {c(', '.join(dna.tags), CYAN)}")
+        print(f"  {c('Created', BOLD)}     : {c(dna.created_at[:19], DIM)}")
+        print()
+
+        print(c("  ── Statistical DNA ──────────────────────────────────", CYAN))
+        print(f"  Correlation hash : {c(dna.statistical.correlation_hash, WHITE)}")
+        top_entropy = sorted(
+            zip(data['df'].columns, dna.statistical.entropy_vector),
+            key=lambda x: x[1], reverse=True
+        )[:3]
+        print(f"  Top entropy cols : {c(', '.join(f'{col}({e:.2f})' for col, e in top_entropy), WHITE)}")
+        print()
+
+        print(c("  ── Structural DNA ───────────────────────────────────", CYAN))
+        print(f"  Schema hash      : {c(dna.structural.schema_hash, WHITE)}")
+        print(f"  Missing mechanism: {c(dna.structural.missing_mechanism, YELLOW if dna.structural.missing_mechanism != 'NONE' else GREEN)}")
+        print(f"  Outlier density  : {c(str(dna.structural.outlier_density), WHITE)}")
+        print(f"  Duplicate ratio  : {c(str(dna.structural.duplicate_ratio), WHITE)}")
+        print()
+
+        print(c("  ── ML DNA ───────────────────────────────────────────", CYAN))
+        sig_color = GREEN if dna.ml.target_signal == "strong" else YELLOW if dna.ml.target_signal == "medium" else RED
+        print(f"  Task             : {c(dna.ml.recommended_task, CYAN)}")
+        print(f"  Target signal    : {c(dna.ml.target_signal, sig_color)}")
+        print(f"  Separability     : {c(str(dna.ml.separability_score), WHITE)}")
+        print(f"  Redundancy       : {c(str(dna.ml.feature_redundancy), WHITE)}")
+        print(f"  Complexity       : {c(str(dna.ml.complexity_score), WHITE)}")
+        print()
+
+        print(c("  ── Temporal DNA ─────────────────────────────────────", CYAN))
+        print(f"  Has temporal     : {c(str(dna.temporal.has_temporal), GREEN if dna.temporal.has_temporal else DIM)}")
+        if dna.temporal.has_temporal:
+            print(f"  Temporal cols    : {c(', '.join(dna.temporal.temporal_columns), WHITE)}")
+            print(f"  Trend detected   : {c(str(dna.temporal.trend_detected), WHITE)}")
+            print(f"  Seasonality      : {c(str(dna.temporal.seasonality_score), WHITE)}")
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()
+
 
 def cmd_interactive() -> None:
     banner()
@@ -1196,12 +1318,13 @@ def cmd_interactive() -> None:
             "21": ("Train/test split advisor", "split"),
             "22": ("Class imbalance detector", "imbalance"),
             "23": ("Pipeline export (sklearn)", "pipeline"),
+            "24": ("Cognitive Data DNA", "dna"),
 
         }
         for key, (label, _) in options.items():
             print(f"  {c(key, YELLOW)}. {label}")
 
-        choice = input(c("\n  Your choice (1-23): ", YELLOW)).strip()
+        choice = input(c("\n  Your choice (1-24): ", YELLOW)).strip()
         action = options.get(choice, ("", "inspect"))[1]
 
         strategy = "mean"
@@ -1245,9 +1368,24 @@ def cmd_interactive() -> None:
         elif action == "suggest":
             cmd_suggest(file_args)
         elif action == "memory":
-            cmd_memory([])
+            print(c("  Memory sub-commands:", BOLD))
+            print(f"  1. List tracked files")
+            print(f"  2. Compare last 2 inspections of current file")
+            print(f"  3. Clear history for current file")
+            m_choice = input(c("\n  Your choice (1-3, default=1): ", YELLOW)).strip() or "1"
+            if m_choice == "2":
+                cmd_memory(["compare", path])
+            elif m_choice == "3":
+                cmd_memory(["clear", path])
+            else:
+                cmd_memory(["list"])
         elif action == "drift":
-            print(c("\n  For drift: python cli.py drift <baseline> <current>\n", YELLOW))
+            print(c("\n  Drift Detection requires a baseline file.", BOLD))
+            base_p = input(c("  Baseline file path: ", YELLOW)).strip().strip('"')
+            if os.path.exists(base_p):
+                cmd_drift([base_p, path])
+            else:
+                print(c(f"  ✗ Baseline file not found: {base_p}", RED))
         elif action == "engineer":
             cmd_engineer(file_args)
         elif action == "target":
@@ -1268,6 +1406,8 @@ def cmd_interactive() -> None:
             cmd_imbalance(file_args)
         elif action == "pipeline":
             cmd_pipeline(file_args)
+        elif action == "dna":
+            cmd_dna(file_args)
 
         print(c("  ✓ Done! Ready for next operation.", GREEN))
         print(SEPARATOR)
@@ -1300,6 +1440,7 @@ COMMANDS = {
     "split":      cmd_split,
     "imbalance":  cmd_imbalance,
     "pipeline":   cmd_pipeline,
+    "dna":        cmd_dna,
 }
 
 

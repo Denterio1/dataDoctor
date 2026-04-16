@@ -93,24 +93,45 @@ pip install -r requirements.txt
 
 ## ⌨️ CLI Commands
 
-```bash
-python cli.py inspect    <file>              # Full report
-python cli.py clean      <file>              # Clean data
-python cli.py stats      <file>              # Column statistics
-python cli.py missing    <file>              # Missing values
-python cli.py duplicates <file>              # Duplicate rows
-python cli.py outliers   <file>              # Outlier detection
-python cli.py export     <file>              # Export cleaned CSV
-python cli.py report     <file>              # HTML report
-python cli.py ml         <file>              # ML Readiness Score
-python cli.py prepare    <file>              # Prepare for ML
-python cli.py relations  <file>              # Column relationships
-python cli.py suggest    <file>              # AI suggestions
-python cli.py memory     list                # Show tracked files
-python cli.py memory     compare <file>      # Compare last 2 runs
-python cli.py drift      <baseline> <current># Drift detection
-python cli.py interactive                    # Guided mode
-```
+`dataDoctor` provides a comprehensive suite of commands for data analysis and ML preparation.
+
+### ── Core Inspection
+| Command | Description |
+|---------|-------------|
+| `inspect <file>` | Full inspection: issues + cleaning + stats + report |
+| `clean <file>` | Clean data (remove dupes + fill missing) |
+| `stats <file>` | Show column statistics only |
+| `missing <file>` | Show missing value counts per column |
+| `duplicates <file>` | Detect and show duplicate rows |
+| `outliers <file>` | Detect outliers using IQR method |
+| `report <file>` | Generate professional HTML report |
+| `export <file>` | Inspect + export cleaned CSV to disk |
+
+### ── Machine Learning & Prep
+| Command | Description |
+|---------|-------------|
+| `ml <file>` | ML Readiness Score & detailed checks |
+| `prepare <file>` | Prepare data for ML (encode + scale) |
+| `target <file>` | Auto-detect best target column for ML |
+| `split <file>` | Train/Test split advisor & code generator |
+| `imbalance <file>` | Class imbalance detector & strategy advisor |
+| `encoding <file>` | Smart Encoding Advisor for categorical data |
+| `importance <file>` | Feature Importance using SHAP values |
+| `automl <file>` | Run 5 models to find the best baseline |
+| `pipeline <file>` | Export full Sklearn/Imblearn pipeline code |
+
+### ── Advanced Analysis
+| Command | Description |
+|---------|-------------|
+| `relations <file>` | Detect column relationships & correlations |
+| `network <file>` | Build & visualize correlation network |
+| `engineer <file>` | Auto Feature Engineering (Date/Text/Num) |
+| `schema <file>` | Schema Validator (Infer/Validate/Export) |
+| `dna <file>` | Cognitive Data DNA (Statistical identity) |
+| `drift <base> <new>` | Detect data drift between two files |
+| `suggest <file>` | AI-powered smart suggestions (needs .env) |
+| `memory` | Track & compare inspection history |
+| `interactive` | Guided interactive mode — no flags needed |
 
 **Options:**
 ```bash
@@ -120,6 +141,7 @@ python cli.py interactive                    # Guided mode
 --strategy drop    # Drop rows with missing values
 --no-dedup         # Keep duplicate rows
 ```
+
 
 ---
 
@@ -195,13 +217,14 @@ pytest tests/ -v
 
 ## 🗺️ Roadmap
 
-| Version | Features |
-|---------|----------|
-| **v0.1.0** ✅ | Core inspection, cleaning, ML prep, web UI |
-| **v0.2.0** | Auto Feature Engineering, Schema Validator |
-| **v0.3.0** | ML Baseline, Feature Importance, Pipeline Export |
-| **v0.4.0** | Database Connector, REST API, Parquet support |
-| **v1.0.0** | Docker, Cloud Deploy, Plugin System |
+| Version | Features | Status |
+|---------|----------|--------|
+| **v0.1.0** | Core inspection, cleaning, ML prep, web UI | ✅ |
+| **v0.2.0** | Auto Feature Engineering, Schema Validator | ✅ |
+| **v0.3.0** | ML Baseline, Feature Importance, Pipeline Export | ✅ |
+| **v0.4.0** | Cognitive DNA, Correlation Network, Target Detection | ✅ |
+| **v0.5.0** | Database Connector, Parquet support, API Mode | 🚧 |
+| **v1.0.0** | Docker, Cloud Deploy, Plugin System | 📅 |
 
 ---
 

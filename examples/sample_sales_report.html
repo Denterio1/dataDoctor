@@ -2,585 +2,126 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>dataDoctor Report — sample_sales.csv</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dataDoctor Report</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&family=DM+Sans:wght@300;400;500&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg:       #0f0f11;
-    --surface:  #17171a;
-    --border:   rgba(255,255,255,0.07);
-    --border2:  rgba(255,255,255,0.12);
-    --text:     #e8e6e1;
-    --muted:    #7a7875;
-    --accent:   #c8f06e;
-    --accent2:  #5ce0c6;
-    --danger:   #f06e6e;
-    --warn:     #f0c46e;
-    --mono:     'DM Mono', monospace;
-    --sans:     'DM Sans', sans-serif;
-    --serif:    'Fraunces', serif;
-  }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    font-weight: 300;
-    font-size: 15px;
-    line-height: 1.7;
-    min-height: 100vh;
-  }
-
-  /* ── Layout ── */
-  .wrap { max-width: 960px; margin: 0 auto; padding: 0 2rem 6rem; }
-
-  /* ── Header ── */
-  header {
-    border-bottom: 0.5px solid var(--border2);
-    padding: 3rem 0 2.5rem;
-    margin-bottom: 3rem;
-  }
-  .header-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 2rem;
-    flex-wrap: wrap;
-  }
-  .logo {
-    font-family: var(--serif);
-    font-size: 13px;
-    font-weight: 300;
-    color: var(--muted);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-  .logo span { color: var(--accent); }
-  h1 {
-    font-family: var(--serif);
-    font-size: clamp(1.8rem, 4vw, 2.8rem);
-    font-weight: 300;
-    line-height: 1.2;
-    color: var(--text);
-  }
-  h1 em {
-    font-style: italic;
-    color: var(--accent);
-  }
-  .meta {
-    font-size: 13px;
-    color: var(--muted);
-    font-family: var(--mono);
-    margin-top: 1rem;
-  }
-  .meta span { color: var(--accent2); }
-
-  /* ── Health score ── */
-  .health-badge {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-  .health-number {
-    font-family: var(--serif);
-    font-size: 3.5rem;
-    font-weight: 600;
-    line-height: 1;
-    color: #f06e6e;
-  }
-  .health-label {
-    font-size: 12px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-family: var(--mono);
-  }
-  .health-bar {
-    width: 120px;
-    height: 3px;
-    background: var(--border2);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 6px;
-  }
-  .health-fill {
-    height: 100%;
-    width: 50%;
-    background: #f06e6e;
-    border-radius: 2px;
-  }
-
-  /* ── Section ── */
-  section { margin-bottom: 3.5rem; }
-  .section-label {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.15em;
-    margin-bottom: 1.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 0.5px;
-    background: var(--border);
-  }
-
-  /* ── Metric cards ── */
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin-bottom: 2rem;
-  }
-  .metric {
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem 1.25rem 1rem;
-  }
-  .metric-val {
-    font-family: var(--serif);
-    font-size: 2rem;
-    font-weight: 600;
-    line-height: 1;
-    margin-bottom: 6px;
-  }
-  .metric-label {
-    font-size: 12px;
-    color: var(--muted);
-    font-family: var(--mono);
-  }
-  .val-good  { color: var(--accent); }
-  .val-warn  { color: var(--warn); }
-  .val-bad   { color: var(--danger); }
-  .val-info  { color: var(--accent2); }
-
-  /* ── Table ── */
-  .table-wrap {
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-  th {
-    text-align: left;
-    padding: 10px 16px;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    border-bottom: 0.5px solid var(--border);
-    font-weight: 400;
-  }
-  td {
-    padding: 11px 16px;
-    border-bottom: 0.5px solid var(--border);
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--text);
-    vertical-align: middle;
-  }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(255,255,255,0.02); }
-
-  /* ── Bar cell ── */
-  .bar-cell { display: flex; align-items: center; gap: 8px; }
-  .bar-track {
-    flex: 1;
-    height: 4px;
-    background: var(--border2);
-    border-radius: 2px;
-    min-width: 60px;
-    overflow: hidden;
-  }
-  .bar-fill { height: 100%; border-radius: 2px; }
-  .bar-num  { font-size: 12px; color: var(--muted); min-width: 36px; text-align: right; }
-
-  /* ── Pill badge ── */
-  .pill {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-family: var(--mono);
-    font-weight: 500;
-  }
-  .pill-good  { background: rgba(200,240,110,0.12); color: var(--accent); }
-  .pill-warn  { background: rgba(240,196,110,0.12); color: var(--warn); }
-  .pill-bad   { background: rgba(240,110,110,0.12); color: var(--danger); }
-  .pill-info  { background: rgba(92,224,198,0.12); color: var(--accent2); }
-
-  /* ── Stats grid ── */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 12px;
-  }
-  .stat-card {
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem;
-  }
-  .stat-name {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent2);
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .stat-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12.5px;
-    padding: 3px 0;
-    border-bottom: 0.5px solid var(--border);
-  }
-  .stat-row:last-child { border-bottom: none; }
-  .stat-key { color: var(--muted); font-family: var(--mono); }
-  .stat-val { color: var(--text); font-family: var(--mono); font-weight: 500; }
-
-  /* ── Empty state ── */
-  .empty {
-    padding: 2rem;
-    text-align: center;
-    color: var(--muted);
-    font-family: var(--mono);
-    font-size: 13px;
-  }
-  .check { color: var(--accent); }
-
-  /* ── Footer ── */
-  footer {
-    border-top: 0.5px solid var(--border);
-    padding-top: 2rem;
-    margin-top: 4rem;
-    font-size: 12px;
-    color: var(--muted);
-    font-family: var(--mono);
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#0f0f11;color:#e8e6e1;padding:2rem}
+  h1{font-size:2rem;color:#c8f06e;margin-bottom:.25rem}
+  .sub{color:#888;font-size:.9rem;margin-bottom:2rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:2rem}
+  .metric{background:#17171a;border-radius:12px;padding:1.25rem;text-align:center}
+  .metric-val{font-size:2rem;font-weight:700;color:#c8f06e}
+  .metric-lbl{font-size:.8rem;color:#888;margin-top:.25rem}
+  .score-val{font-size:3rem;font-weight:700;color:#c8f06e}
+  section{margin-bottom:2rem}
+  h2{font-size:1.1rem;color:#c8f06e;border-bottom:1px solid #2a2a2e;padding-bottom:.5rem;margin-bottom:1rem}
+  table{width:100%;border-collapse:collapse;background:#17171a;border-radius:8px;overflow:hidden}
+  th{background:#1e1e22;padding:.75rem 1rem;text-align:left;font-size:.8rem;color:#888;text-transform:uppercase}
+  td{padding:.65rem 1rem;border-bottom:1px solid #2a2a2e;font-size:.9rem}
+  .bar{height:8px;background:#c8f06e;border-radius:4px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem}
+  .card{background:#17171a;border-radius:10px;padding:1rem}
+  .card-title{font-weight:600;margin-bottom:.35rem}
+  .card-badge{display:inline-block;font-size:.7rem;padding:.2rem .5rem;border-radius:20px;background:#2a2a2e;color:#888;margin-bottom:.5rem}
+  .card-detail{font-size:.82rem;color:#aaa;margin-top:.2rem}
+  ul{padding-left:1.25rem;color:#aaa;font-size:.9rem;line-height:1.8}
+  footer{margin-top:3rem;text-align:center;color:#444;font-size:.8rem}
 </style>
 </head>
 <body>
-<div class="wrap">
+<h1>🩺 dataDoctor Report</h1>
+<div class="sub">File: sample_sales.csv</div>
 
-  <header>
-    <div class="header-top">
-      <div>
-        <p class="logo">🩺 <span>data</span>Doctor</p>
-        <h1>Report for<br><em>sample_sales.csv</em></h1>
-        <p class="meta">Generated <span>April 09, 2026  20:18</span></p>
-      </div>
-      <div class="health-badge">
-        <div class="health-number">50</div>
-        <div class="health-label">Health score</div>
-        <div class="health-bar"><div class="health-fill"></div></div>
-        <div class="health-label" style="margin-top:4px;">poor</div>
-      </div>
-    </div>
-  </header>
-
-  <!-- ── Overview ── -->
-  <section>
-    <p class="section-label">Overview</p>
-    <div class="metrics">
-      <div class="metric">
-        <div class="metric-val val-info">15</div>
-        <div class="metric-label">rows</div>
-      </div>
-      <div class="metric">
-        <div class="metric-val val-info">8</div>
-        <div class="metric-label">columns</div>
-      </div>
-      <div class="metric">
-        <div class="metric-val val-bad">4</div>
-        <div class="metric-label">missing cells</div>
-      </div>
-      <div class="metric">
-        <div class="metric-val val-good">0</div>
-        <div class="metric-label">duplicate rows</div>
-      </div>
-      <div class="metric">
-        <div class="metric-val val-warn">2</div>
-        <div class="metric-label">cols with outliers</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Missing values ── -->
-  <section>
-    <p class="section-label">Missing values</p>
-    
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Column</th><th>Status</th><th>Missing %</th></tr></thead>
-        <tbody>
-        <tr>
-          <td>order_id</td>
-          <td><span class="pill pill-good">complete</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:0%;background:#c8f06e;"></div></div>
-              <span class="bar-num">0.0%</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>product</td>
-          <td><span class="pill pill-good">complete</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:0%;background:#c8f06e;"></div></div>
-              <span class="bar-num">0.0%</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>category</td>
-          <td><span class="pill pill-good">complete</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:0%;background:#c8f06e;"></div></div>
-              <span class="bar-num">0.0%</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>quantity</td>
-          <td><span class="pill pill-bad">1 missing</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:6%;background:#f0c46e;"></div></div>
-              <span class="bar-num">6.7%</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>unit_price</td>
-          <td><span class="pill pill-bad">1 missing</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:6%;background:#f0c46e;"></div></div>
-              <span class="bar-num">6.7%</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>total</td>
-          <td><span class="pill pill-good">complete</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:0%;background:#c8f06e;"></div></div>
-              <span class="bar-num">0.0%</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>region</td>
-          <td><span class="pill pill-bad">1 missing</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:6%;background:#f0c46e;"></div></div>
-              <span class="bar-num">6.7%</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td>sales_rep</td>
-          <td><span class="pill pill-bad">1 missing</span></td>
-          <td>
-            <div class="bar-cell">
-              <div class="bar-track"><div class="bar-fill" style="width:6%;background:#f0c46e;"></div></div>
-              <span class="bar-num">6.7%</span>
-            </div>
-          </td>
-        </tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- ── Outliers ── -->
-  <section>
-    <p class="section-label">Outlier detection — IQR method</p>
-    
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Column</th><th>Count</th><th>Safe range</th><th>Outlier values</th></tr></thead>
-        <tbody>
-        <tr>
-          <td>quantity</td>
-          <td><span class="pill pill-warn">3 outliers</span></td>
-          <td>-2.125 → 8.875</td>
-          <td style="color:var(--danger);">10.0, 20.0, 10.0</td>
-        </tr>
-        <tr>
-          <td>total</td>
-          <td><span class="pill pill-warn">3 outliers</span></td>
-          <td>-546.7425 → 1031.2375</td>
-          <td style="color:var(--danger);">1799.98, 1799.98, 1799.98</td>
-        </tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- ── Column statistics ── -->
-  <section>
-    <p class="section-label">Column statistics</p>
-    <div class="stats-grid">
-      
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>order_id</span>
-            <span class="pill pill-info">numeric</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">min</span><span class="stat-val">1001.0</span></div>
-            <div class="stat-row"><span class="stat-key">max</span><span class="stat-val">1015.0</span></div>
-            <div class="stat-row"><span class="stat-key">mean</span><span class="stat-val">1008.0</span></div>
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">15</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">15</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>product</span>
-            <span class="pill pill-good">text</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">12</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">15</span></div>
-            <div class="stat-row"><span class="stat-key">top value</span><span class="stat-val">Laptop Pro</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>category</span>
-            <span class="pill pill-good">text</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">3</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">15</span></div>
-            <div class="stat-row"><span class="stat-key">top value</span><span class="stat-val">Electronics</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>quantity</span>
-            <span class="pill pill-info">numeric</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">min</span><span class="stat-val">1.0</span></div>
-            <div class="stat-row"><span class="stat-key">max</span><span class="stat-val">20.0</span></div>
-            <div class="stat-row"><span class="stat-key">mean</span><span class="stat-val">4.7143</span></div>
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">7</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">14</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>unit_price</span>
-            <span class="pill pill-info">numeric</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">min</span><span class="stat-val">1.99</span></div>
-            <div class="stat-row"><span class="stat-key">max</span><span class="stat-val">899.99</span></div>
-            <div class="stat-row"><span class="stat-key">mean</span><span class="stat-val">339.8507</span></div>
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">11</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">14</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>total</span>
-            <span class="pill pill-info">numeric</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">min</span><span class="stat-val">0.0</span></div>
-            <div class="stat-row"><span class="stat-key">max</span><span class="stat-val">1799.98</span></div>
-            <div class="stat-row"><span class="stat-key">mean</span><span class="stat-val">494.506</span></div>
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">11</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">15</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>region</span>
-            <span class="pill pill-good">text</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">4</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">14</span></div>
-            <div class="stat-row"><span class="stat-key">top value</span><span class="stat-val">South</span></div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-name">
-            <span>sales_rep</span>
-            <span class="pill pill-good">text</span>
-          </div>
-          
-            <div class="stat-row"><span class="stat-key">unique</span><span class="stat-val">5</span></div>
-            <div class="stat-row"><span class="stat-key">count</span><span class="stat-val">14</span></div>
-            <div class="stat-row"><span class="stat-key">top value</span><span class="stat-val">Bob</span></div>
-        </div>
-    </div>
-  </section>
-
-  <!-- ── Cleaning log ── -->
-  <section>
-    <p class="section-label">Cleaning log</p>
-    
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Column</th><th>Action</th><th>Result</th><th>Value used</th></tr></thead>
-        <tbody>
-                <tr>
-                  <td>quantity</td>
-                  <td>mean</td>
-                  <td><span class="pill pill-good">1 filled</span></td>
-                  <td style="color:var(--accent2);">4.7143</td>
-                </tr>
-                <tr>
-                  <td>unit_price</td>
-                  <td>mean</td>
-                  <td><span class="pill pill-good">1 filled</span></td>
-                  <td style="color:var(--accent2);">339.8507</td>
-                </tr>
-                <tr>
-                  <td>region</td>
-                  <td>mean</td>
-                  <td><span class="pill pill-good">1 filled</span></td>
-                  <td style="color:var(--accent2);">South</td>
-                </tr>
-                <tr>
-                  <td>sales_rep</td>
-                  <td>mean</td>
-                  <td><span class="pill pill-good">1 filled</span></td>
-                  <td style="color:var(--accent2);">Bob</td>
-                </tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <footer>
-    <span>dataDoctor v0.1.0</span>
-    <span>examples/sample_sales.csv</span>
-    <span>April 09, 2026  20:18</span>
-  </footer>
-
+<div class="grid">
+  <div class="metric"><div class="score-val">80</div><div class="metric-lbl">Health Score / 100 — Good</div></div>
+  <div class="metric"><div class="metric-val">15</div><div class="metric-lbl">Rows</div></div>
+  <div class="metric"><div class="metric-val">8</div><div class="metric-lbl">Columns</div></div>
+  <div class="metric"><div class="metric-val">4</div><div class="metric-lbl">Cols with Missing</div></div>
+  <div class="metric"><div class="metric-val">0</div><div class="metric-lbl">Duplicate Rows</div></div>
+  <div class="metric"><div class="metric-val">0</div><div class="metric-lbl">Outlier Cols</div></div>
 </div>
+
+<section><h2>⚠️ Missing Values</h2><table><thead><tr><th>Column</th><th>Missing</th><th>%</th><th>Bar</th></tr></thead><tbody>
+            <tr>
+              <td>quantity</td>
+              <td>1</td>
+              <td>6.7%</td>
+              <td><div class="bar" style="width:20.1%"></div></td>
+            </tr>
+            <tr>
+              <td>unit_price</td>
+              <td>1</td>
+              <td>6.7%</td>
+              <td><div class="bar" style="width:20.1%"></div></td>
+            </tr>
+            <tr>
+              <td>region</td>
+              <td>1</td>
+              <td>6.7%</td>
+              <td><div class="bar" style="width:20.1%"></div></td>
+            </tr>
+            <tr>
+              <td>sales_rep</td>
+              <td>1</td>
+              <td>6.7%</td>
+              <td><div class="bar" style="width:20.1%"></div></td>
+            </tr></tbody></table></section>
+
+
+
+<section><h2>📊 Column Statistics</h2><div class="cards">
+        <div class="card">
+          <div class="card-title">order_id</div>
+          <div class="card-badge">numeric</div>
+          <div class="card-detail">min 1001.0 / max 1015.0 / mean 1008.0</div>
+          <div class="card-detail">unique: 15</div>
+        </div>
+        <div class="card">
+          <div class="card-title">product</div>
+          <div class="card-badge">text</div>
+          <div class="card-detail">most common: <b>Laptop Pro</b></div>
+          <div class="card-detail">unique: 10</div>
+        </div>
+        <div class="card">
+          <div class="card-title">category</div>
+          <div class="card-badge">text</div>
+          <div class="card-detail">most common: <b>Electronics</b></div>
+          <div class="card-detail">unique: 3</div>
+        </div>
+        <div class="card">
+          <div class="card-title">quantity</div>
+          <div class="card-badge">numeric</div>
+          <div class="card-detail">min 1.0 / max 20.0 / mean 4.3571</div>
+          <div class="card-detail">unique: 7</div>
+        </div>
+        <div class="card">
+          <div class="card-title">unit_price</div>
+          <div class="card-badge">numeric</div>
+          <div class="card-detail">min 1.99 / max 899.99 / mean 296.0279</div>
+          <div class="card-detail">unique: 10</div>
+        </div>
+        <div class="card">
+          <div class="card-title">total</div>
+          <div class="card-badge">numeric</div>
+          <div class="card-detail">min 0.0 / max 1799.98 / mean 503.5027</div>
+          <div class="card-detail">unique: 10</div>
+        </div>
+        <div class="card">
+          <div class="card-title">region</div>
+          <div class="card-badge">text</div>
+          <div class="card-detail">most common: <b>North</b></div>
+          <div class="card-detail">unique: 4</div>
+        </div>
+        <div class="card">
+          <div class="card-title">sales_rep</div>
+          <div class="card-badge">text</div>
+          <div class="card-detail">most common: <b>Alice</b></div>
+          <div class="card-detail">unique: 4</div>
+        </div></div></section>
+
+
+
+<footer>Generated by dataDoctor</footer>
 </body>
 </html>
