@@ -65,7 +65,7 @@ def compute_feature_importance(
 
     # ── Encode text columns ───────────────────────────────────────────────────
     encoders = {}
-    for col in X.select_dtypes(include="object").columns:
+    for col in X.select_dtypes(include=["object", "string"]).columns:
         le = LabelEncoder()
         X[col] = le.fit_transform(X[col].astype(str))
         encoders[col] = le

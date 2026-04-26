@@ -31,13 +31,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+
+from src.data.advanced_outlier import OutlierAnalyzer
+from src.data.advanced_outlier import detect_outliers, full_outlier_report
+from src.data.db_connector import build_connector
+from src.data.db_query     import DBSession
 from src.data.dna_memory import get_dna_manager
 from src.data.cognitive_dna import CognitiveDNA
 from src.data.pipeline_export import export_pipeline
 from src.data.imbalance_detector import detect_imbalance
 from src.data.split_advisor import advise_split
 from src.data.feature_importance import compute_feature_importance
-from src.data.auto_ml import run_auto_ml
+from src.data.advanced_automl import run_automl as run_advanced_automl
+from src.data.advanced_imputer import ai_impute as run_ai_impute, SmartImputer
 from src.data.schema_validator import validate_schema, infer_schema, schema_to_dict, schema_from_dict
 from src.data.encoding_advisor import encoding_advisor
 from src.data.correlation_network import build_correlation_network
@@ -86,11 +92,11 @@ def usage() -> None:
     banner()
     print(c("  COMMANDS", BOLD + CYAN))
     print()
-    
     print(c("  ── Core Inspection ──────────────────────────────────", CYAN))
     core_cmds = [
         ("inspect   <file>",   "Full inspection: issues + cleaning + stats + report"),
         ("clean     <file>",   "Clean data (remove dupes + fill missing)"),
+        ("ai-impute <file>",   "🚀 Multimodal AI Impute (Transformers/Diffusion/Vision)"),
         ("stats     <file>",   "Show column statistics only"),
         ("missing   <file>",   "Show missing value counts per column"),
         ("duplicates <file>",  "Detect and show duplicate rows"),
@@ -100,6 +106,7 @@ def usage() -> None:
     ]
     for cmd, desc in core_cmds:
         print(f"  {c('python cli.py', DIM)} {c(cmd, YELLOW)}  {c(desc, DIM)}")
+
 
     print()
     print(c("  ── Machine Learning & Prep ──────────────────────────", CYAN))
@@ -348,25 +355,33 @@ def cmd_duplicates(args: list[str]) -> None:
 def cmd_outliers(args: list[str]) -> None:
     path = require_file(args)
     banner()
-    print(c(f"  Outlier Detection: {path}", CYAN))
+    print(c(f"  Advanced Outlier Detection: {path}", CYAN))
     print(SEPARATOR)
 
-    data   = safe_load(path)
-    result = detect_outliers(data)
+    data     = safe_load(path)["df"]
+    analyzer = OutlierAnalyzer(verbose=False)
+    report   = analyzer.analyze(data)
+    analyzer.print_report(report)
+
+def cmd_report(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  Smart Report Generator: {path}", CYAN))
+    print(SEPARATOR)
+
+    from src.data.quality_score import DataQualityScorer
+    from src.smart_report import SmartReport
+    from pathlib import Path
+
+    df       = safe_load(path)["df"] 
+    profile  = DataQualityScorer().score(df)
+    reporter = SmartReport(output_dir="reports")
+    paths    = reporter.generate_all(profile, df, Path(path).stem)
 
     print()
-    if not result:
-        print(c("  ✓ No outliers detected — data looks clean!", GREEN))
-    else:
-        print(c(f"  ⚠  Outliers found in {len(result)} column(s):\n", YELLOW))
-        for col, info in result.items():
-            print(c(f"  ┌─ {col}", CYAN))
-            print(f"  │  count  : {c(str(info['count']), YELLOW)}")
-            print(f"  │  safe range : {c(str(info['lower']), GREEN)} → {c(str(info['upper']), GREEN)}")
-            print(f"  │  values : {c(str(info['values']), RED)}")
-            print(c("  └" + "─" * 40, DIM))
+    for fmt, p in paths.items():
+        print(c(f"  ✓ {fmt.upper()}: {p}", GREEN))
     print()
-
 
 def cmd_export(args: list[str]) -> None:
     path = require_file(args)
@@ -386,17 +401,22 @@ def cmd_export(args: list[str]) -> None:
 
 def cmd_report(args: list[str]) -> None:
     path = require_file(args)
-    opts = parse_options(args[1:])
     banner()
-    print(c(f"  Generating HTML report for: {path}", CYAN))
+    print(c(f"  Smart Report Generator: {path}", CYAN))
     print(SEPARATOR)
-    doctor   = DataDoctor(remove_dupes=opts["dedup"], missing_strategy=opts["strategy"])
-    result   = doctor.inspect(path)
-    base, _  = os.path.splitext(path)
-    out_path = f"{base}_report.html"
-    generate_html_report(result, out_path)
-    print(c(f"  ✓ Report saved to: {out_path}", GREEN))
-    print(c(f"  ✓ Open it in your browser!", CYAN))
+
+    from src.data.quality_score import DataQualityScorer
+    from src.smart_report import SmartReport
+    from pathlib import Path
+
+    df       = safe_load(path)["df"]
+    profile  = DataQualityScorer().score(df)
+    reporter = SmartReport(output_dir="reports")
+    paths    = reporter.generate_all(profile, df, Path(path).stem)
+
+    print()
+    for fmt, p in paths.items():
+        print(c(f"  ✓ {fmt.upper()}: {p}", GREEN))
     print()
 
 
@@ -674,6 +694,8 @@ def cmd_suggest(args: list[str]) -> None:
         return
 
     data     = safe_load(path)
+    if "rows" not in data:
+        data["rows"] = data["df"].to_dict("records")
     analysis = full_report(data)
     outliers = detect_outliers(data)
     rels     = detect_relationships(data, threshold=0.4)
@@ -946,52 +968,87 @@ def cmd_network(args: list[str]) -> None:
 def cmd_automl(args: list[str]) -> None:
     path = require_file(args)
     banner()
-    print(c(f"  Auto ML Baseline: {path}", CYAN))
+    print(c(f"  Advanced Auto ML (Optuna): {path}", CYAN))
     print(SEPARATOR)
 
     data = safe_load(path)
 
     print()
     target = input(c("  Target column name: ", YELLOW)).strip()
-    task   = input(c("  Task type (auto/classification/regression): ", YELLOW)).strip() or "auto"
+    limit  = input(c("  Time limit in seconds (default=300): ", YELLOW)).strip() or "300"
+    stack  = input(c("  Use Model Stacking? (y/n, default=y): ", YELLOW)).strip().lower() != "n"
 
     print()
-    print(c("  Training 5 models with cross-validation...", DIM))
+    print(c(f"  Optimizing 15+ models for {limit}s...", DIM))
     print()
 
     try:
-        result = run_auto_ml(data, target_col=target, task_type=task)
+        result = run_advanced_automl(data, target_col=target, time_limit=int(limit), use_stacking=stack)
 
-        print(c(f"  ── Results ({result['task_type'].upper()}) ──────────────────────────────", CYAN))
-        print()
-        print(f"  {c('Target', BOLD)}   : {c(result['target'], CYAN)}")
-        print(f"  {c('Rows', BOLD)}     : {c(str(result['n_rows']), WHITE)}")
-        print(f"  {c('Features', BOLD)} : {c(str(result['n_features']), WHITE)}")
-        print(f"  {c('Metric', BOLD)}   : {c(result['best_metric'], WHITE)}")
+        print(c(f"  ── Best Model ───────────────────────────────────────", CYAN))
+        print(f"  🏆 {c(result['best_model'], GREEN + BOLD)}")
+        print(f"  Score : {c('{:.4f}'.format(result['best_score']), GREEN)}")
         print()
 
-        for i, r in enumerate(result["results"]):
-            if r["status"] == "failed":
-                print(f"  {'#'+str(i+1):<4} {c(r['model'], DIM):<25} {c('failed', RED)}")
-                continue
-
+        print(c("  ── Model Leaderboard ────────────────────────────────", CYAN))
+        print()
+        for i, r in enumerate(result["leaderboard"][:10]):
             score = r["score"]
-            color = GREEN if score >= 0.8 else YELLOW if score >= 0.6 else RED
             bar_w = int(score * 20)
-            bar   = c("█" * bar_w + "░" * (20 - bar_w), color)
-            crown = " 🏆" if i == 0 else ""
+            bar   = c("█" * bar_w + "░" * (20 - bar_w), GREEN if i==0 else DIM)
+            print(f"  #{i+1:<2} {c(r['model'], WHITE if i==0 else DIM):<25} {bar} {c(f'{score:.4f}', WHITE)}")
 
-            print(f"  {'#'+str(i+1):<4} {c(r['model'], WHITE if i==0 else DIM):<25} "
-                  f"{bar}  {c(f'{score:.4f}', color)} ± {c(str(r['std']), DIM)}{crown}")
-
-        print()
-        print(c("  ── Best Model ───────────────────────────────────────", CYAN))
-        print(f"  {c(result['best_model'], GREEN + BOLD)}")
-        print(f"  {c(result['best_metric'], DIM)} = {c(str(result['best_score']), GREEN)} "
-              f"± {c(str(result['best_std']), DIM)}")
         print()
         print(c("  ── Recommendation ───────────────────────────────────", CYAN))
         print(f"  {c(result['recommendation'], WHITE)}")
+
+        if "pipeline_code" in result:
+            base, _ = os.path.splitext(path)
+            out_path = f"{base}_best_pipeline.py"
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(result["pipeline_code"])
+            print()
+            print(c(f"  ✓ Exported best pipeline to: {out_path}", GREEN))
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()
+
+def cmd_ai_impute(args: list[str]) -> None:
+    path = require_file(args)
+    banner()
+    print(c(f"  🚀 AI Multimodal Impute: {path}", CYAN))
+    print(SEPARATOR)
+
+    data = safe_load(path)
+    print()
+    img_col = input(c("  Image path column (optional): ", YELLOW)).strip() or None
+    doc_col = input(c("  Doc path column (optional): ", YELLOW)).strip() or None
+
+    print()
+    print(c("  Running Transformers + Diffusion + Vision Pipeline...", DIM))
+    print()
+
+    try:
+        res = run_ai_impute(data["df"], image_col=img_col, doc_col=doc_col)
+        
+        print(c("  ── Imputation Results ───────────────────────────────", CYAN))
+        print(f"  Method    : {c(res.method, GREEN)}")
+        print(f"  Cells fixed: {c(str(res.n_imputed), YELLOW)}")
+        print(f"  Duration  : {c(f'{res.duration_ms/1000:.1f}s', DIM)}")
+        print()
+
+        if res.warnings:
+            print(c("  ── Warnings ─────────────────────────────────────────", YELLOW))
+            for w in res.warnings:
+                print(f"  {c('⚠', YELLOW)} {w}")
+            print()
+
+        base, ext = os.path.splitext(path)
+        out_path  = f"{base}_ai_fixed{ext}"
+        res.df_imputed.to_csv(out_path, index=False)
+        print(c(f"  ✓ AI-fixed file saved to: {out_path}", GREEN))
 
     except Exception as e:
         print(c(f"  ✗ Error: {e}", RED))
@@ -1214,6 +1271,170 @@ def cmd_pipeline(args: list[str]) -> None:
 
     print()
 
+def cmd_connect(args: list[str]) -> None:
+    banner()
+    print(c("  🗄️  Database Connector", CYAN))
+    print(SEPARATOR)
+    print()
+
+    db_type = input(c("  DB type (postgresql/mysql/sqlite): ", YELLOW)).strip().lower()
+
+    if db_type == "sqlite":
+        filepath = input(c("  File path: ", YELLOW)).strip()
+        kwargs   = {"db_type": "sqlite", "filepath": filepath}
+    else:
+        host     = input(c("  Host (localhost): ", YELLOW)).strip() or "localhost"
+        port     = input(c("  Port: ", YELLOW)).strip()
+        database = input(c("  Database: ", YELLOW)).strip()
+        username = input(c("  Username: ", YELLOW)).strip()
+        password = input(c("  Password: ", YELLOW)).strip()
+        kwargs   = {
+            "db_type":  db_type,
+            "host":     host,
+            "port":     int(port) if port else (5432 if db_type == "postgresql" else 3306),
+            "database": database,
+            "username": username,
+            "password": password,
+        }
+
+    print()
+    print(c("  Connecting...", DIM))
+
+    try:
+        connector = build_connector(**kwargs)
+        ok, msg   = connector.connect()
+
+        if not ok:
+            print(c(f"  ✗ {msg}", RED))
+            return
+
+        print(c(f"  ✓ {msg}", GREEN))
+        session = DBSession(connector)
+
+        # Show tables
+        tables = session.connector.get_tables()
+        print()
+        print(c(f"  Found {len(tables)} table(s):\n", CYAN))
+        for t in tables:
+            print(f"  {c(t['table'], WHITE):<30} {c(str(t['rows']), YELLOW)} rows")
+
+        print()
+        print(c("  ── Commands ─────────────────────────────────────────", CYAN))
+        print(c("  tables           ← show all tables", DIM))
+        print(c("  analyse <table>  ← full dataDoctor analysis", DIM))
+        print(c("  schema <table>   ← show table structure", DIM))
+        print(c("  export <table>   ← export table to CSV", DIM))
+        print(c("  clean <table>    ← analyse + clean data", DIM))
+        print(c("  sql              ← run custom SQL query", DIM))
+        print(c("  exit             ← disconnect", DIM))
+
+        # Interactive loop
+        while True:
+            cmd = input(c("  db> ", YELLOW)).strip()
+
+            if cmd == "exit":
+                session.disconnect()
+                print(c("  Disconnected.", DIM))
+                break
+
+            elif cmd.startswith("analyse "):
+                table = cmd.split(" ", 1)[1].strip()
+                print(c(f"  Loading {table}...", DIM))
+                try:
+                    data = session.editor.run_table(table, limit=10_000)
+                    from src.data.analyzer     import full_report, detect_outliers
+                    from src.data.ml_readiness import ml_readiness
+                    analysis = full_report(data)
+                    outliers = detect_outliers(data)
+                    ml = ml_readiness(data, outliers if isinstance(outliers, dict) else {})
+                    print(c(f"  ✓ {len(data['df'])} rows loaded", GREEN))
+                    print(f"  ML Score : {c(str(ml['score']), GREEN)}/100")
+                    print(f"  Missing  : {c(str(sum(analysis['missing_values'].values())), YELLOW)}")
+                    print(f"  Dupes    : {c(str(analysis['duplicate_rows']), YELLOW)}")
+                except Exception as e:
+                    print(c(f"  ✗ {e}", RED))
+
+            elif cmd == "sql":
+                sql = input(c("  SQL> ", YELLOW)).strip()
+                try:
+                    result = session.editor.run(sql)
+                    print(c(f"  ✓ {result['rows']} rows in {result['duration_ms']:.0f}ms", GREEN))
+                    print(result["df"].head(10).to_string())
+                except Exception as e:
+                    print(c(f"  ✗ {e}", RED))
+            elif cmd == "tables":
+                tables = session.connector.get_tables()
+                if not tables:
+                    print(c("  No tables found.", DIM))
+                else:
+                    print()
+                    for t in tables:
+                        print(f"  {c(t['table'], WHITE):<30} {c(str(t['rows']), YELLOW)} rows  {c(str(t['columns']), DIM)} cols")
+                    print()
+
+            elif cmd.startswith("schema "):
+                table = cmd.split(" ", 1)[1].strip()
+                try:
+                    info = session.connector.get_table_info(table)
+                    if not info:
+                        print(c(f"  Table '{table}' not found.", RED))
+                    else:
+                        print()
+                        print(c(f"  {table}", BOLD))
+                        print(f"  Rows: {c(str(info.row_count), YELLOW)}")
+                        print()
+                        for col in info.columns:
+                            pk  = c(" PK", GREEN) if col.primary_key else ""
+                            fk  = c(f" FK→{col.foreign_key}", DIM) if col.foreign_key else ""
+                            null= c(" nullable", DIM) if col.nullable else ""
+                            print(f"  {c(col.name, WHITE):<25} {c(col.dtype, CYAN)}{pk}{fk}{null}")
+                        print()
+                except Exception as e:
+                    print(c(f"  ✗ {e}", RED))
+
+            elif cmd.startswith("export "):
+                table = cmd.split(" ", 1)[1].strip()
+                try:
+                    data     = session.editor.run_table(table, limit=100_000)
+                    out_path = f"{table}_export.csv"
+                    data["df"].to_csv(out_path, index=False, encoding="utf-8")
+                    print(c(f"  ✓ Exported {len(data['df']):,} rows to {out_path}", GREEN))
+                except Exception as e:
+                    print(c(f"  ✗ {e}", RED))
+
+            elif cmd.startswith("clean "):
+                table = cmd.split(" ", 1)[1].strip()
+                try:
+                    data     = session.editor.run_table(table, limit=50_000)
+                    from src.data.analyzer     import full_report, detect_outliers
+                    from src.data.ml_readiness import ml_readiness
+                    from src.data.cleaner      import handle_missing, remove_duplicates
+                    analysis = full_report(data)
+                    outliers = detect_outliers(data)
+                    ml       = ml_readiness(data, outliers)
+                    cleaned, _ = handle_missing(data, strategy="mean")
+                    cleaned, _ = remove_duplicates(cleaned)
+                    out_path   = f"{table}_cleaned.csv"
+                    cleaned["df"].to_csv(out_path, index=False)
+                    print()
+                    print(c(f"  ── Analysis: {table} ──────────────────────────────", CYAN))
+                    print(f"  ML Score  : {c(str(ml['score']), GREEN)}/100")
+                    print(f"  Missing   : {c(str(sum(analysis['missing_values'].values())), YELLOW)}")
+                    print(f"  Duplicates: {c(str(analysis['duplicate_rows']), YELLOW)}")
+                    print(f"  Outlier cols: {c(str(len(outliers)), YELLOW)}")
+                    print(c(f"  ✓ Cleaned file saved: {out_path}", GREEN))
+                    print()
+                except Exception as e:
+                    print(c(f"  ✗ {e}", RED))        
+
+            else:
+                print(c("  Unknown command. Try: analyse <table> | sql | exit", DIM))
+
+    except Exception as e:
+        print(c(f"  ✗ Error: {e}", RED))
+
+    print()    
+
 def cmd_dna(args: list[str]) -> None:
     path = require_file(args)
     banner()
@@ -1274,6 +1495,14 @@ def cmd_dna(args: list[str]) -> None:
 
     print()
 
+def cmd_quality(args):
+    import pandas as pd
+    from src.data.quality_score import DataQualityScorer
+    df      = pd.read_csv(args[0])
+    scorer  = DataQualityScorer()
+    profile = scorer.score(df)
+    scorer.print_report(profile)    
+
 
 def cmd_interactive() -> None:
     banner()
@@ -1302,29 +1531,31 @@ def cmd_interactive() -> None:
             "5":  ("Detect outliers",            "outliers"),
             "6":  ("Clean and save to new file", "export"),
             "7":  ("Generate HTML report",       "report"),
-            "8":  ("ML Readiness Score",         "ml"),
-            "9":  ("Prepare data for ML",        "prepare"),
-            "10": ("Column relationships",       "relations"),
-            "11": ("AI smart suggestions",       "suggest"),
-            "12": ("Data memory & history",      "memory"),
-            "13": ("Drift detection",            "drift"),
-            "14": ("Auto feature engineering", "engineer"),
-            "15": ("Target column detection", "target"),
-            "16": ("Correlation network", "network"),
-            "17": ("Smart Encoding Advisor", "encoding"),
-            "18": ("Schema Validator", "schema"),
-            "19": ("Auto ML baseline", "automl"),
-            "20": ("Feature importance (SHAP)", "importance"),
-            "21": ("Train/test split advisor", "split"),
-            "22": ("Class imbalance detector", "imbalance"),
-            "23": ("Pipeline export (sklearn)", "pipeline"),
-            "24": ("Cognitive Data DNA", "dna"),
+            "8":  ("🚀 Multimodal AI Impute",    "ai-impute"),
+            "9":  ("ML Readiness Score",         "ml"),
+            "10": ("Prepare data for ML",        "prepare"),
+            "11": ("Column relationships",       "relations"),
+            "12": ("AI smart suggestions",       "suggest"),
+            "13": ("Data memory & history",      "memory"),
+            "14": ("Drift detection",            "drift"),
+            "15": ("Auto feature engineering",   "engineer"),
+            "16": ("Target column detection",    "target"),
+            "17": ("Correlation network",        "network"),
+            "18": ("Smart Encoding Advisor",     "encoding"),
+            "19": ("Schema Validator",           "schema"),
+            "20": ("🏆 Advanced Auto ML (Optuna)", "automl"),
+            "21": ("Feature importance (SHAP)",  "importance"),
+            "22": ("Train/test split advisor",   "split"),
+            "23": ("Class imbalance detector",   "imbalance"),
+            "24": ("Pipeline export (sklearn)",  "pipeline"),
+            "25": ("Cognitive Data DNA",         "dna"),
+            "26": ("Database connector",         "connect"),
 
         }
         for key, (label, _) in options.items():
             print(f"  {c(key, YELLOW)}. {label}")
 
-        choice = input(c("\n  Your choice (1-24): ", YELLOW)).strip()
+        choice = input(c("\n  Your choice (1-26): ", YELLOW)).strip()
         action = options.get(choice, ("", "inspect"))[1]
 
         strategy = "mean"
@@ -1360,6 +1591,13 @@ def cmd_interactive() -> None:
             cmd_report(file_args)
         elif action == "ml":
             cmd_ml(file_args)
+        elif action == "quality":  
+            from src.data.quality_score import DataQualityScorer
+            import pandas as pd
+            df = pd.read_csv(file_args[0])
+            scorer  = DataQualityScorer()
+            profile = scorer.score(df)
+            scorer.print_report(profile)    
         elif action == "prepare":
             file_args += ["--strategy", strategy]
             cmd_prepare(file_args)
@@ -1408,6 +1646,8 @@ def cmd_interactive() -> None:
             cmd_pipeline(file_args)
         elif action == "dna":
             cmd_dna(file_args)
+        elif action == "connect":
+            cmd_connect([])    
 
         print(c("  ✓ Done! Ready for next operation.", GREEN))
         print(SEPARATOR)
@@ -1441,6 +1681,9 @@ COMMANDS = {
     "imbalance":  cmd_imbalance,
     "pipeline":   cmd_pipeline,
     "dna":        cmd_dna,
+    "connect": cmd_connect,
+    "quality" : cmd_quality,
+    "report" : cmd_report,  
 }
 
 

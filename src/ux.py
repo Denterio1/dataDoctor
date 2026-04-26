@@ -47,12 +47,12 @@ def render_welcome() -> None:
          "Fill missing values, remove duplicates, and export clean data ready for use."),
         ("🤖", "ML Pipeline",
          "Auto ML baseline, feature importance, and a complete sklearn pipeline export."),
+        ("🗄️", "Database Connector",
+         "Connect to PostgreSQL, MySQL, or SQLite and analyse tables directly."),
         ("🧬", "Cognitive DNA",
          "A unique fingerprint of your dataset — detect similarity and drift over time."),
         ("💡", "AI Suggestions",
          "Connect any LLM (Groq, Gemini, OpenAI) for personalised data advice."),
-        ("🔒", "Privacy First",
-         "Data processed in memory only. PII detection built in. Nothing stored."),
     ]
 
     for i, (icon, title, desc) in enumerate(features):

@@ -75,7 +75,7 @@ def prepare_for_ml(
     # ── Step 4: Encode text columns ───────────────────────────────────────────
     encoded = {}
     if encode:
-        for col in df.select_dtypes(include="object").columns:
+        for col in df.select_dtypes(include=["object", "string"]).columns:
             mapping = {v: i for i, v in enumerate(df[col].unique())}
             df[col] = df[col].map(mapping)
             encoded[col] = mapping

@@ -1,5 +1,5 @@
 [server]
-maxUploadSize = 4096
+maxUploadSize = 10000
 
 [theme]
 backgroundColor = "#0f0f11"

@@ -1,15 +1,18 @@
+import pandas as pd
+import math
 from typing import Any
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def _get_df(data: dict[str, Any]):
+def _get_df(data: dict[str, Any]) -> pd.DataFrame:
     """Return a pandas DataFrame from data."""
     if "df" in data:
         return data["df"]
-
-    import pandas as pd
-    return pd.DataFrame(data.get("rows", []))
+    rows = data.get("rows")
+    if isinstance(rows, list):
+        return pd.DataFrame(rows)
+    return pd.DataFrame()
 
 
 def _numeric_values(rows: list[dict], col: str) -> list[float]:
@@ -18,10 +21,20 @@ def _numeric_values(rows: list[dict], col: str) -> list[float]:
         val = row.get(col)
         if val is not None:
             try:
-                result.append(float(val))
-            except (ValueError, TypeError):
+                fval = float(val)
+                if math.isfinite(fval):
+                    result.append(fval)
+            except (ValueError, TypeError, OverflowError):
                 pass
     return result
+
+
+def _safe_float(val: Any) -> float | None:
+    try:
+        fval = float(val)
+        return fval if math.isfinite(fval) else None
+    except (ValueError, TypeError, OverflowError):
+        return None
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -29,25 +42,30 @@ def _numeric_values(rows: list[dict], col: str) -> list[float]:
 def shape(data: dict[str, Any]) -> dict[str, int]:
     df = _get_df(data)
     return {
-        "rows": df.shape[0],
-        "columns": df.shape[1],
+        "rows": int(df.shape[0]),
+        "columns": int(df.shape[1]),
     }
 
 
 def missing_values(data: dict[str, Any]) -> dict[str, int]:
     df = _get_df(data)
-    return df.isna().sum().to_dict()
+    counts = df.isna().sum().to_dict()
+    return {str(k): int(v) for k, v in counts.items()}
 
 
 def duplicate_rows(data: dict[str, Any]) -> int:
     df = _get_df(data)
-    return int(df.duplicated().sum())
+    try:
+        return int(df.duplicated().sum())
+    except Exception:
+        # Fallback for unhashable types (e.g. lists in columns)
+        return int(df.astype(str).duplicated().sum())
 
 
 def basic_stats(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
     stats: dict[str, dict[str, Any]] = {}
 
-    # نحافظ على نفس المنطق القديم لو rows موجودة
+    # Maintain original dictionary-based logic if rows/columns exist
     if "rows" in data and "columns" in data:
         rows = data["rows"]
         columns = data["columns"]
@@ -56,31 +74,49 @@ def basic_stats(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
             non_null = [row[col] for row in rows if row.get(col) is not None]
             numeric = _numeric_values(rows, col)
 
-            if numeric and len(numeric) / max(len(non_null), 1) >= 0.8:
+            # Determine type based on 80% numeric threshold
+            is_numeric = bool(numeric) and (len(numeric) / max(len(non_null), 1) >= 0.8)
+
+            if is_numeric:
                 mean_val = sum(numeric) / len(numeric) if numeric else None
+                
+                # Safe unique count for potentially unhashable types
+                try:
+                    unique_count = len(set(non_null))
+                except TypeError:
+                    unique_count = len(set(str(v) for v in non_null))
+
                 stats[col] = {
                     "type":   "numeric",
-                    "unique": len(set(non_null)),
+                    "unique": unique_count,
                     "count":  len(numeric),
-                    "min":    min(numeric),
-                    "max":    max(numeric),
-                    "mean":   round(mean_val, 4) if mean_val is not None else None,
+                    "min":    _safe_float(min(numeric)) if numeric else None,
+                    "max":    _safe_float(max(numeric)) if numeric else None,
+                    "mean":   _safe_float(mean_val) if mean_val is not None else None,
                 }
             else:
                 freq: dict[str, int] = {}
                 for v in non_null:
-                    freq[str(v)] = freq.get(str(v), 0) + 1
+                    s_v = str(v)
+                    freq[s_v] = freq.get(s_v, 0) + 1
+                
                 top = max(freq, key=freq.get) if freq else None
+                
+                try:
+                    unique_count = len(set(non_null))
+                except TypeError:
+                    unique_count = len(freq)
+
                 stats[col] = {
                     "type":       "text",
-                    "unique":     len(set(non_null)),
+                    "unique":     unique_count,
                     "count":      len(non_null),
                     "most_common": top,
                 }
 
         return stats
 
-    # fallback: pandas
+    # Fallback to pandas-based logic
     df = _get_df(data)
 
     for col in df.columns:
@@ -95,15 +131,20 @@ def basic_stats(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
                 "type": "numeric",
                 "unique": int(series.nunique()),
                 "count": int(series.count()),
-                "min": float(series.min()),
-                "max": float(series.max()),
-                "mean": round(float(series.mean()), 4),
+                "min": _safe_float(series.min()),
+                "max": _safe_float(series.max()),
+                "mean": _safe_float(series.mean()),
             }
         else:
+            try:
+                unique_count = int(series.nunique())
+            except TypeError:
+                unique_count = int(series.astype(str).nunique())
+
             mode = series.mode()
             stats[col] = {
                 "type": "text",
-                "unique": int(series.nunique()),
+                "unique": unique_count,
                 "count": int(series.count()),
                 "most_common": mode.iloc[0] if not mode.empty else None,
             }
@@ -111,19 +152,8 @@ def basic_stats(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return stats
 
 
-def full_report(data: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "shape":          shape(data),
-        "missing_values": missing_values(data),
-        "duplicate_rows": duplicate_rows(data),
-        "column_stats":   basic_stats(data),
-    }
-
-
-def detect_outliers(data: dict) -> dict:
+def detect_outliers(data: dict[str, Any]) -> dict[str, Any]:
     df = _get_df(data)
-
-    import pandas as pd
     result = {}
 
     for col in df.columns:
@@ -140,11 +170,23 @@ def detect_outliers(data: dict) -> dict:
         outliers = df[(df[col] < lower) | (df[col] > upper)][col]
 
         if not outliers.empty:
+            # Limit returned values to avoid bloating reports
+            val_list = outliers.tolist()
             result[col] = {
                 "count":  int(len(outliers)),
-                "lower":  round(float(lower), 4),
-                "upper":  round(float(upper), 4),
-                "values": outliers.tolist(),
+                "lower":  _safe_float(lower),
+                "upper":  _safe_float(upper),
+                "values": val_list[:100], 
             }
 
     return result
+
+
+def full_report(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "shape":          shape(data),
+        "missing_values": missing_values(data),
+        "duplicate_rows": duplicate_rows(data),
+        "column_stats":   basic_stats(data),
+        "outliers":       detect_outliers(data),
+    }

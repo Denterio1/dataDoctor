@@ -1,16 +1,11 @@
 """
 auth.py — User Authentication & Database (Supabase)
 
-Handles:
-    - User registration and login
-    - Session tracking
-    - Usage analytics
-    - Privacy-first design (no data stored, only metadata)
+Simplified version without OAuth.
 """
 
 from __future__ import annotations
 import os
-import hashlib
 from datetime import datetime
 from typing import Any
 
@@ -31,44 +26,48 @@ def _get_client():
         return None
 
 
-def register_or_login(email: str, name: str = "") -> dict[str, Any] | None:
-    """
-    Register a new user or update last_seen for existing user.
-
-    Args:
-        email: User email address.
-        name:  Display name (optional).
-
-    Returns:
-        User dict or None if failed.
-    """
+def sync_user_to_db(user: Any) -> None:
+    """Sync user to public.users table."""
     client = _get_client()
-    if not client:
-        return None
+    if not client or not user:
+        return
 
     try:
-        # Check if user exists
-        result = client.table("users").select("*").eq("email", email).execute()
+        # Get metadata
+        user_id = user.get("id")
+        email = user.get("email")
+        name = user.get("name") or (email.split("@")[0] if email else "User")
+        plan = user.get("plan", "professional")
 
-        if result.data:
-            # Update last_seen
-            client.table("users").update({
-                "last_seen": datetime.now().isoformat(),
-            }).eq("email", email).execute()
-            return result.data[0]
-        else:
-            # Create new user
-            new_user = {
-                "email":      email,
-                "name":       name or email.split("@")[0],
-                "created_at": datetime.now().isoformat(),
-                "last_seen":  datetime.now().isoformat(),
-                "plan":       "free",
-            }
-            result = client.table("users").insert(new_user).execute()
-            return result.data[0] if result.data else None
-    except Exception:
-        return None
+        client.table("users").upsert({
+            "id": user_id,
+            "email": email,
+            "name": name,
+            "last_seen": datetime.now().isoformat(),
+            "plan": plan
+        }).execute()
+    except Exception as e:
+        print(f"Warning: Could not sync user to DB: {e}")
+
+
+def sign_up(email: str, password: str, name: str = "") -> dict[str, Any] | str:
+    """Register a new user (Legacy)."""
+    return "Registration is disabled in this version."
+
+
+def sign_in(email: str, password: str) -> dict[str, Any] | str:
+    """Authenticate a user (Legacy)."""
+    return "Login is disabled in this version."
+
+
+def register_or_login(email: str, name: str = "") -> dict[str, Any] | None:
+    """Legacy support for email-only flow."""
+    return {
+        "id": "guest_user",
+        "email": email or "guest@example.com",
+        "name": name or "Guest",
+        "plan": "professional"
+    }
 
 
 def log_session(
@@ -78,16 +77,7 @@ def log_session(
     action:    str,
     ml_score:  int = 0,
 ) -> None:
-    """
-    Log a user session/action.
-
-    Args:
-        email:     User email.
-        file_name: Name of the file analysed.
-        file_size: File size in bytes.
-        action:    Action performed (inspect, clean, ml, etc).
-        ml_score:  ML Readiness Score if computed.
-    """
+    """Log a user session/action."""
     client = _get_client()
     if not client:
         return
@@ -113,59 +103,16 @@ def log_session(
 
 
 def get_user_stats(email: str) -> dict[str, Any]:
-    """
-    Get usage statistics for a user.
-
-    Returns:
-        {
-            "total_sessions": int,
-            "files_analysed": int,
-            "avg_ml_score":   float,
-            "last_seen":      str,
-            "plan":           str,
-        }
-    """
-    client = _get_client()
-    if not client:
-        return {}
-
-    try:
-        user_result = client.table("users").select("*").eq("email", email).execute()
-        if not user_result.data:
-            return {}
-
-        user    = user_result.data[0]
-        user_id = user["id"]
-
-        sessions_result = client.table("sessions").select("*").eq("user_id", user_id).execute()
-        sessions = sessions_result.data or []
-
-        ml_scores = [s["ml_score"] for s in sessions if s.get("ml_score", 0) > 0]
-
-        return {
-            "name":            user.get("name", ""),
-            "plan":            user.get("plan", "free"),
-            "total_sessions":  len(sessions),
-            "files_analysed":  len(set(s["file_name"] for s in sessions)),
-            "avg_ml_score":    round(sum(ml_scores) / len(ml_scores), 1) if ml_scores else 0,
-            "last_seen":       user.get("last_seen", "")[:19].replace("T", " "),
-            "member_since":    user.get("created_at", "")[:10],
-        }
-    except Exception:
-        return {}
-
-
-def get_all_users() -> list[dict]:
-    """Get all users (admin only)."""
-    client = _get_client()
-    if not client:
-        return []
-
-    try:
-        result = client.table("users").select("*").order("created_at", desc=True).execute()
-        return result.data or []
-    except Exception:
-        return []
+    """Get usage statistics for a user."""
+    return {
+        "name":            "Guest",
+        "plan":            "professional",
+        "total_sessions":  0,
+        "files_analysed":  0,
+        "avg_ml_score":    0,
+        "last_seen":       datetime.now().isoformat()[:19].replace("T", " "),
+        "member_since":    datetime.now().isoformat()[:10],
+    }
 
 
 def is_supabase_configured() -> bool:
