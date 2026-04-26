@@ -44,3 +44,6 @@ referencing==0.37.0
 rpds-py==0.30.0
 smmap==5.0.3
 fastapi
+reportlab
+python-docx
+python-pptx
