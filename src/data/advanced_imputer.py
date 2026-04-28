@@ -972,65 +972,69 @@ class ImputationReporter:
 # 14. NEURAL TABULAR IMPUTATION (PyTorch DAE & VAE)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class DenoisingAutoencoder(nn.Module):
-    """Standard DAE for robust feature reconstruction."""
-    def __init__(self, input_dim, hidden_dim=256, dropout=0.2):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.BatchNorm1d(hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, hidden_dim // 4),
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(hidden_dim // 4, hidden_dim // 2),
-            nn.BatchNorm1d(hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, input_dim),
-        )
+if TORCH_OK:
+    class DenoisingAutoencoder(nn.Module):
+        """Standard DAE for robust feature reconstruction."""
+        def __init__(self, input_dim, hidden_dim=256, dropout=0.2):
+            super().__init__()
+            self.encoder = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, hidden_dim // 2),
+                nn.BatchNorm1d(hidden_dim // 2),
+                nn.ReLU(),
+                nn.Linear(hidden_dim // 2, hidden_dim // 4),
+            )
+            self.decoder = nn.Sequential(
+                nn.Linear(hidden_dim // 4, hidden_dim // 2),
+                nn.BatchNorm1d(hidden_dim // 2),
+                nn.ReLU(),
+                nn.Linear(hidden_dim // 2, hidden_dim),
+                nn.BatchNorm1d(hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, input_dim),
+            )
 
-    def forward(self, x):
-        return self.decoder(self.encoder(x))
+        def forward(self, x):
+            return self.decoder(self.encoder(x))
 
 
-class VariationalAutoencoder(nn.Module):
-    """VAE for probabilistic imputation and uncertainty estimation."""
-    def __init__(self, input_dim, latent_dim=32, hidden_dim=256):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-        )
-        self.fc_mu = nn.Linear(hidden_dim // 2, latent_dim)
-        self.fc_logvar = nn.Linear(hidden_dim // 2, latent_dim)
-        
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, input_dim),
-        )
+    class VariationalAutoencoder(nn.Module):
+        """VAE for probabilistic imputation and uncertainty estimation."""
+        def __init__(self, input_dim, latent_dim=32, hidden_dim=256):
+            super().__init__()
+            self.encoder = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim // 2),
+                nn.ReLU(),
+            )
+            self.fc_mu = nn.Linear(hidden_dim // 2, latent_dim)
+            self.fc_logvar = nn.Linear(hidden_dim // 2, latent_dim)
+            
+            self.decoder = nn.Sequential(
+                nn.Linear(latent_dim, hidden_dim // 2),
+                nn.ReLU(),
+                nn.Linear(hidden_dim // 2, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, input_dim),
+            )
 
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
+        def reparameterize(self, mu, logvar):
+            std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(std)
+            return mu + eps * std
 
-    def forward(self, x):
-        h = self.encoder(x)
-        mu, logvar = self.fc_mu(h), self.fc_logvar(h)
-        z = self.reparameterize(mu, logvar)
-        return self.decoder(z), mu, logvar
+        def forward(self, x):
+            h = self.encoder(x)
+            mu, logvar = self.fc_mu(h), self.fc_logvar(h)
+            z = self.reparameterize(mu, logvar)
+            return self.decoder(z), mu, logvar
+else:
+    class DenoisingAutoencoder: pass
+    class VariationalAutoencoder: pass
 
 
 class NeuralTabularImputer(BaseImputer):
@@ -1165,40 +1169,43 @@ class NeuralTabularImputer(BaseImputer):
 # 15. CROSS-MODAL ATTENTION IMPUTER
 # ══════════════════════════════════════════════════════════════════════════════
 
-class CrossModalAttentionModel(nn.Module):
-    """
-    Complex Transformer-based architecture that attends to both 
-    numerical and textual embeddings for joint imputation.
-    """
-    def __init__(self, num_dim, text_dim, embed_dim=128, n_heads=4):
-        super().__init__()
-        self.num_proj = nn.Linear(num_dim, embed_dim)
-        self.text_proj = nn.Linear(text_dim, embed_dim)
-        
-        self.attention = nn.MultiheadAttention(embed_dim, n_heads, batch_first=True)
-        
-        self.num_head = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, num_dim)
-        )
-        self.text_head = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim),
-            nn.ReLU(),
-            nn.Linear(embed_dim, text_dim)
-        )
+if TORCH_OK:
+    class CrossModalAttentionModel(nn.Module):
+        """
+        Complex Transformer-based architecture that attends to both 
+        numerical and textual embeddings for joint imputation.
+        """
+        def __init__(self, num_dim, text_dim, embed_dim=128, n_heads=4):
+            super().__init__()
+            self.num_proj = nn.Linear(num_dim, embed_dim)
+            self.text_proj = nn.Linear(text_dim, embed_dim)
+            
+            self.attention = nn.MultiheadAttention(embed_dim, n_heads, batch_first=True)
+            
+            self.num_head = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim),
+                nn.ReLU(),
+                nn.Linear(embed_dim, num_dim)
+            )
+            self.text_head = nn.Sequential(
+                nn.Linear(embed_dim, embed_dim),
+                nn.ReLU(),
+                nn.Linear(embed_dim, text_dim)
+            )
 
-    def forward(self, x_num, x_text):
-        # x_num: [B, N], x_text: [B, T]
-        n_feat = self.num_proj(x_num).unsqueeze(1) # [B, 1, E]
-        t_feat = self.text_proj(x_text).unsqueeze(1) # [B, 1, E]
-        
-        combined = torch.cat([n_feat, t_feat], dim=1) # [B, 2, E]
-        attn_out, _ = self.attention(combined, combined, combined)
-        
-        n_out = self.num_head(attn_out[:, 0, :])
-        t_out = self.text_head(attn_out[:, 1, :])
-        return n_out, t_out
+        def forward(self, x_num, x_text):
+            # x_num: [B, N], x_text: [B, T]
+            n_feat = self.num_proj(x_num).unsqueeze(1) # [B, 1, E]
+            t_feat = self.text_proj(x_text).unsqueeze(1) # [B, 1, E]
+            
+            combined = torch.cat([n_feat, t_feat], dim=1) # [B, 2, E]
+            attn_out, _ = self.attention(combined, combined, combined)
+            
+            n_out = self.num_head(attn_out[:, 0, :])
+            t_out = self.text_head(attn_out[:, 1, :])
+            return n_out, t_out
+else:
+    class CrossModalAttentionModel: pass
 
 
 class CrossModalAttentionImputer(BaseImputer):
@@ -1597,27 +1604,30 @@ class AdvancedMultimodalImputer(BaseImputer):
 # 19. DIFFUSION-BASED IMPUTATION (SOTA AI)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class DiffusionImputerModel(nn.Module):
-    """
-    Denoising Diffusion Probabilistic Model (DDPM) adapted for Tabular Data.
-    One of the most advanced generative AI techniques for data reconstruction.
-    """
-    def __init__(self, dim, hidden_dim=512):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(dim + 1, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, dim)
-        )
+if TORCH_OK:
+    class DiffusionImputerModel(nn.Module):
+        """
+        Denoising Diffusion Probabilistic Model (DDPM) adapted for Tabular Data.
+        One of the most advanced generative AI techniques for data reconstruction.
+        """
+        def __init__(self, dim, hidden_dim=512):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(dim + 1, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, dim)
+            )
 
-    def forward(self, x, t):
-        # x: [B, D], t: [B, 1]
-        xt = torch.cat([x, t], dim=1)
-        return self.net(xt)
+        def forward(self, x, t):
+            # x: [B, D], t: [B, 1]
+            xt = torch.cat([x, t], dim=1)
+            return self.net(xt)
+else:
+    class DiffusionImputerModel: pass
 
 
 class DenoisingDiffusionImputer(BaseImputer):
