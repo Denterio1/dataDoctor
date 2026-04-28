@@ -13,8 +13,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import streamlit as st
 import hashlib
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+except ImportError as e:
+    st.error(f"Failed to import Plotly: {e}")
+    st.info("Try to 'Reboot app' with 'Clear cache' in Streamlit Cloud management.")
+    st.stop()
 from io import StringIO, BytesIO
 
 from src.data.advanced_outlier import OutlierAnalyzer, SmartDetector, detect_outliers

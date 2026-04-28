@@ -34,7 +34,6 @@ import pandas as pd
 
 from src.smart_report import SmartReport
 from src.data import analyzer
-from src.data import analyzer
 from src.data.quality_score import DataQualityScorer
 from src.data.advanced_stats import AdvancedStats
 # ── Core data modules ──────────────────────────────────────────────────────
@@ -51,6 +50,7 @@ from src.data.advanced_outlier import (
     OutlierReport,
     SmartDetector,
     EnsembleOutlierDetector,
+    OutlierReporter,
 )
 # ── Optional modules — graceful fallback ───────────────────────────────────
 def _safe_import(module_path: str, names: List[str]) -> Dict[str, Any]:
@@ -404,7 +404,9 @@ class DataDoctor:
         self._log(f"📂 Loading: {filepath}")
         raw_data = load_csv(filepath)
 
-        if isinstance(raw_data, dict):
+        if isinstance(raw_data, dict) and "df" in raw_data:
+            df = raw_data["df"]
+        elif isinstance(raw_data, dict):
             df = pd.DataFrame(raw_data.get("data", raw_data))
         elif isinstance(raw_data, pd.DataFrame):
             df = raw_data
@@ -630,6 +632,24 @@ class DataDoctor:
 
         # Build final human-readable summary
         output["summary"] = self._build_summary(df, current_df, output, source)
+
+        # ── Compatibility Layer for Tests ──
+        # Existing tests expect certain keys in the output dict
+        if "analyze" in output:
+            output["raw_analysis"] = output["analyze"]
+        
+        output["clean_data"] = {"df": current_df}
+        
+        cleaning_log = {}
+        if "remove_duplicates" in output and isinstance(output["remove_duplicates"], dict):
+            removed = output["remove_duplicates"].get("removed", 0)
+            if removed > 0:
+                cleaning_log["duplicates_removed"] = removed
+        if "impute" in output and isinstance(output["impute"], dict):
+            cleaning_log["missing_filled"] = output["impute"].get("filled", 0)
+        
+        output["cleaning_log"] = cleaning_log
+
         self._log(f"✅ Done in {session.elapsed()}s")
         return output
 
@@ -719,7 +739,7 @@ class DataDoctor:
         if cached:
             self._log_decision("analyze", "Using cached result", "Same data hash")
             return cached
-        result = full_report(df)
+        result = full_report({"df": df})
         self._cache.set(self._session.session_id, "analyze", df, result)
         return result
 
@@ -735,24 +755,27 @@ class DataDoctor:
 
         try:
             imputer = SmartImputer()
-            imputed = imputer.fit_transform(df)
+            result = imputer.fit_transform(df)
+            imputed = result.df_imputed
             filled = int(df.isnull().sum().sum() - imputed.isnull().sum().sum())
             return {"clean_df": imputed, "filled": filled, "method": method}
         except Exception:
             # Fallback to basic imputation
             self._log_decision("impute", "Fallback to median", "SmartImputer failed")
-            filled_df, log = handle_missing(df, strategy=self.missing_strategy,
-                                            fill_value=self.fill_value)
-            return {"clean_df": filled_df, "log": log, "method": "median_fallback"}
+            data_dict = {"df": df}
+            filled_data, log = handle_missing(data_dict, strategy=self.missing_strategy,
+                                              fill_value=self.fill_value)
+            return {"clean_df": filled_data["df"], "log": log, "method": "median_fallback"}
 
     def _step_remove_dupes(self, df: pd.DataFrame) -> Dict:
         """Remove duplicate rows."""
         if not self.remove_dupes:
             return {"skipped": True}
         n_before = len(df)
-        clean, removed = remove_duplicates(df)
+        data_dict = {"df": df}
+        clean_data, removed = remove_duplicates(data_dict)
         self._log_decision("remove_duplicates", f"Removed {removed}", f"Before={n_before}")
-        return {"clean_df": clean, "removed": removed}
+        return {"clean_df": clean_data["df"], "removed": removed}
 
     def _step_outliers(self, df: pd.DataFrame) -> Dict:
         """Smart outlier detection."""
@@ -781,7 +804,11 @@ class DataDoctor:
     def _step_ml_readiness(self, df: pd.DataFrame) -> Dict:
         """Compute ML Readiness Score."""
         try:
-            return ml_readiness_score(df)
+            # ml_readiness expects (data_dict, outliers_dict)
+            data_dict = {"df": df}
+            # We use the simple detector for the readiness score
+            simple_outliers = analyzer.detect_outliers(data_dict)
+            return ml_readiness(data_dict, simple_outliers)
         except Exception as e:
             return {"error": str(e)}
 
@@ -850,12 +877,10 @@ class DataDoctor:
 
     def _step_quality_score(self, df: pd.DataFrame, current_output: Dict) -> Dict:
         """Compute unified Data Quality Score."""
-        cls = _quality_sc.get("DataQualityScore")
-        if cls is None:
-            return {"error": "quality_score module not available — will be added in next update"}
         try:
-            scorer = cls(df, analysis=current_output.get("analyze"))
-            return scorer.compute()
+            scorer = DataQualityScorer()
+            profile = scorer.score(df)
+            return profile.to_dict()
         except Exception as e:
             return {"error": str(e)}
 

@@ -34,7 +34,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest tests/ -v --tb=short
+        pytest
 
     - name: Check code quality
       run: |

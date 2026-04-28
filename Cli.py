@@ -358,9 +358,9 @@ def cmd_outliers(args: list[str]) -> None:
     print(c(f"  Advanced Outlier Detection: {path}", CYAN))
     print(SEPARATOR)
 
-    data     = safe_load(path)["df"]
+    data     = safe_load(path)
     analyzer = OutlierAnalyzer(verbose=False)
-    report   = analyzer.analyze(data)
+    report   = analyzer.analyze(data["df"])
     analyzer.print_report(report)
 
 def cmd_report(args: list[str]) -> None:
